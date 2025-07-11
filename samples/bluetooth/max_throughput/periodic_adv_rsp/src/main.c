@@ -37,14 +37,14 @@ static struct bt_uuid_128 pawr_char_uuid =
 	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
 static uint16_t pawr_attr_handle;
 static const struct bt_le_per_adv_param per_adv_params = {
-	.interval_min = 0x50,  /* 80 * 1.25ms = 100ms - reduced for more frequent events */
-	.interval_max = 0x50,  /* Keep same as min for consistent timing */
-	.options = 0,
+	.interval_min = 0x30,  /* 48 * 1.25ms = 60ms */
+	.interval_max = 0x30,  /* Keep same as min for consistent timing */
+	.options = BT_LE_ADV_OPT_USE_TX_POWER,  /* Include TX power in advertising PDU */
 	.num_subevents = NUM_SUBEVENTS,
-	/* Optimized timing for 20 response slots */
-	.subevent_interval = 0x18,  /* 24 * 1.25ms = 30ms - reduced but still sufficient */
-	.response_slot_delay = 0x4,  /* 4 * 1.25ms = 5ms - slightly reduced */
-	.response_slot_spacing = 0x10,  /* 16 * 0.125ms = 2ms - reduced for tighter spacing */
+	/* Adjusted timing for better reliability */
+	.subevent_interval = 0x20,  /* 32 * 1.25ms = 40ms - increased for more processing time */
+	.response_slot_delay = 0x10,  /* 16 * 1.25ms = 20ms - increased to ensure proper setup */
+	.response_slot_spacing = 0x08,  /* 8 * 0.125ms = 1ms - increased spacing between slots */
 	.num_response_slots = NUM_RSP_SLOTS,
 };
 
@@ -65,22 +65,34 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
 
 	to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
 
+	printk("Request CB: start=%d, count=%d, to_send=%d\n", 
+           request->start, request->count, to_send);
+
 	for (size_t i = 0; i < to_send; i++) {
 		buf = &bufs[i];
-		buf->data[buf->len - 1] = counter++;
+		
+		/* Update the last byte as a counter */
+		if (buf->len < PACKET_SIZE) {
+			net_buf_simple_add_u8(buf, counter++);
+		}
 
-		subevent_data_params[i].subevent =
-			(request->start + i) % per_adv_params.num_subevents;
+		/* Ensure subevent index is valid */
+		subevent_data_params[i].subevent = 0; /* Since NUM_SUBEVENTS is 1 */
 		subevent_data_params[i].response_slot_start = 0;
 		subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
 		subevent_data_params[i].data = buf;
+
+		printk("Subevent %d setup: slot_start=%d, slot_count=%d, buf_len=%d\n",
+               i, subevent_data_params[i].response_slot_start,
+               subevent_data_params[i].response_slot_count,
+               buf->len);
 	}
 
 	err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
 	if (err) {
 		printk("Failed to set subevent data (err %d)\n", err);
 	} else {
-		printk("Subevent data set %d\n", counter);
+		printk("Subevent data set successfully, counter=%d\n", counter);
 	}
 }
 
@@ -261,15 +273,21 @@ static void write_func(struct bt_conn *conn, uint8_t err, struct bt_gatt_write_p
 
 void init_bufs(void)
 {
-	for (size_t i = 0; i < ARRAY_SIZE(backing_store); i++) {
-		backing_store[i][0] = ARRAY_SIZE(backing_store[i]) - 1;
-		backing_store[i][1] = BT_DATA_MANUFACTURER_DATA;
-		backing_store[i][2] = 0x59; /* Nordic */
-		backing_store[i][3] = 0x00;
-
-		net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
-					      ARRAY_SIZE(backing_store[i]));
-	}
+    for (size_t i = 0; i < ARRAY_SIZE(backing_store); i++) {
+        /* Initialize the buffer first */
+        net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
+                                  ARRAY_SIZE(backing_store[i]));
+        
+        /* Reset the buffer to prepare for writing */
+        net_buf_simple_reset(&bufs[i]);
+        
+        /* Add manufacturer specific data */
+        net_buf_simple_add_u8(&bufs[i], 3); /* Length of manufacturer data */
+        net_buf_simple_add_u8(&bufs[i], BT_DATA_MANUFACTURER_DATA);
+        net_buf_simple_add_le16(&bufs[i], 0x0059); /* Nordic Company ID */
+        
+        printk("Buffer %d initialized with len %d\n", i, bufs[i].len);
+    }
 }
 
 #define MAX_SYNCS (NUM_SUBEVENTS * NUM_RSP_SLOTS)
