@@ -10,6 +10,8 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
+#include <stdio.h>
+
 
 /* Add throughput measurement variables */
 static uint32_t total_bytes;
@@ -44,7 +46,6 @@ static const struct bt_le_per_adv_param per_adv_params = {
 	.interval_max = 0x40,  /* Keep same as min for consistent timing */
 	.options = BT_LE_ADV_OPT_USE_TX_POWER,  /* Include TX power in advertising PDU */
 	.num_subevents = NUM_SUBEVENTS,
-	/* Adjusted timing for better reliability */
 	.subevent_interval = 0x30,  /* 32 * 1.25ms = 40ms - increased for more processing time */
 	.response_slot_delay = 0x18,  /* 16 * 1.25ms = 20ms - increased to ensure proper setup */
 	.response_slot_spacing = 0x04,  /* 8 * 0.125ms = 1ms - increased spacing between slots */
@@ -85,7 +86,6 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
         
-        // Add counter
         if (counter == UINT8_MAX) {
             counter = 0;
         }
@@ -94,7 +94,6 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         // Update length field (excluding the length byte itself)
         *length_field = buf->len - 1;
 
-        // Set up subevent parameters
         subevent_data_params[i].subevent = request->start + i;
         subevent_data_params[i].response_slot_start = 0;
         subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
@@ -129,34 +128,41 @@ static bool print_ad_field(struct bt_data *data, void *user_data)
 
 static struct bt_conn *default_conn;
 
+
 static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response_info *info,
-		     struct net_buf_simple *buf)
+                     struct net_buf_simple *buf)
 {
-	int64_t delta;
+    int64_t delta;
 
-	if (buf) {
-		/* Initialize timestamp on first response */
-		if (total_bytes == 0) {
-			stamp = k_uptime_get_32();
-		}
+    if (buf) {
+        /* Initialize timestamp on first response */
+        if (total_bytes == 0) {
+            stamp = k_uptime_get_32();
+        }
 
-		total_bytes += buf->len;
-		
-		/* Print throughput every second */
-		if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
-			delta = k_uptime_delta(&stamp);
+        total_bytes += buf->len;
+        
+		//printk("Received response of length %d\n", buf->len);
+
+        if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
+            delta = k_uptime_delta(&stamp);
 			
-			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-			       total_bytes, total_bytes / 1024, 
-			       delta, ((uint64_t)total_bytes * 8 / delta));
-			
-			/* Reset counters for next interval */
-			total_bytes = 0;
-		}
 
-		printk("Response: subevent %d, slot %d\n", info->subevent, info->response_slot);
-		bt_data_parse(buf, print_ad_field, NULL);
-	}
+            printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
+                   total_bytes, total_bytes / 1024, 
+                   delta, ((uint64_t)total_bytes * 8 / delta));
+			FILE *log = fopen("throughput.log", "a");
+			if (log) {
+				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",total_bytes, 
+					total_bytes / 1024, delta, ((uint64_t)total_bytes * 8 / delta));
+				fclose(log);
+			}
+            total_bytes = 0;
+        }
+
+        printk("Response: subevent %d, slot %d\n", info->subevent, info->response_slot);
+        bt_data_parse(buf, print_ad_field, NULL);
+    }
 }
 
 static const struct bt_le_ext_adv_cb adv_cb = {
@@ -295,7 +301,6 @@ void init_bufs(void)
         net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
                                   ARRAY_SIZE(backing_store[i]));
         
-        /* Reset the buffer to prepare for writing */
         net_buf_simple_reset(&bufs[i]);
         
         /* Add manufacturer specific data */
