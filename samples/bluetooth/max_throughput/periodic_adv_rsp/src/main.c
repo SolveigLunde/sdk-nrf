@@ -15,11 +15,14 @@
 static uint32_t total_bytes;
 static uint64_t stamp;
 #define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
+#define DEBUG_VERBOSE 0
 
 #define NUM_RSP_SLOTS 20
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
 #define NAME_LEN      30
+
+#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
 
 static K_SEM_DEFINE(sem_connected, 0, 1);
 static K_SEM_DEFINE(sem_discovered, 0, 1);
@@ -37,14 +40,14 @@ static struct bt_uuid_128 pawr_char_uuid =
 	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
 static uint16_t pawr_attr_handle;
 static const struct bt_le_per_adv_param per_adv_params = {
-	.interval_min = 0x30,  /* 48 * 1.25ms = 60ms */
-	.interval_max = 0x30,  /* Keep same as min for consistent timing */
+	.interval_min = 0x40,  /* 48 * 1.25ms = 60ms */
+	.interval_max = 0x40,  /* Keep same as min for consistent timing */
 	.options = BT_LE_ADV_OPT_USE_TX_POWER,  /* Include TX power in advertising PDU */
 	.num_subevents = NUM_SUBEVENTS,
 	/* Adjusted timing for better reliability */
-	.subevent_interval = 0x20,  /* 32 * 1.25ms = 40ms - increased for more processing time */
-	.response_slot_delay = 0x10,  /* 16 * 1.25ms = 20ms - increased to ensure proper setup */
-	.response_slot_spacing = 0x08,  /* 8 * 0.125ms = 1ms - increased spacing between slots */
+	.subevent_interval = 0x30,  /* 32 * 1.25ms = 40ms - increased for more processing time */
+	.response_slot_delay = 0x18,  /* 16 * 1.25ms = 20ms - increased to ensure proper setup */
+	.response_slot_spacing = 0x04,  /* 8 * 0.125ms = 1ms - increased spacing between slots */
 	.num_response_slots = NUM_RSP_SLOTS,
 };
 
@@ -59,41 +62,55 @@ static uint8_t counter;
 
 static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_data_request *request)
 {
-	int err;
-	uint8_t to_send;
-	struct net_buf_simple *buf;
+    int err;
+    uint8_t to_send;
+    struct net_buf_simple *buf;
 
-	to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
+    if (!request) {
+        printk("Error: NULL request received\n");
+        return;
+    }
 
-	printk("Request CB: start=%d, count=%d, to_send=%d\n", 
-           request->start, request->count, to_send);
+    to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
 
-	for (size_t i = 0; i < to_send; i++) {
-		buf = &bufs[i];
-		
-		/* Update the last byte as a counter */
-		if (buf->len < PACKET_SIZE) {
-			net_buf_simple_add_u8(buf, counter++);
-		}
+    // Process each subevent
+    for (size_t i = 0; i < to_send; i++) {
+        buf = &bufs[i];
+        
+        // Reset buffer for each request
+        net_buf_simple_reset(buf);
+        
+        // Add manufacturer specific data
+        uint8_t *length_field = net_buf_simple_add(buf, 1);
+        net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
+        net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
+        
+        // Add counter
+        if (counter == UINT8_MAX) {
+            counter = 0;
+        }
+        net_buf_simple_add_u8(buf, counter++);
+        
+        // Update length field (excluding the length byte itself)
+        *length_field = buf->len - 1;
 
-		/* Ensure subevent index is valid */
-		subevent_data_params[i].subevent = 0; /* Since NUM_SUBEVENTS is 1 */
-		subevent_data_params[i].response_slot_start = 0;
-		subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
-		subevent_data_params[i].data = buf;
+        // Set up subevent parameters
+        subevent_data_params[i].subevent = request->start + i;
+        subevent_data_params[i].response_slot_start = 0;
+        subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
+        subevent_data_params[i].data = buf;
 
-		printk("Subevent %d setup: slot_start=%d, slot_count=%d, buf_len=%d\n",
-               i, subevent_data_params[i].response_slot_start,
-               subevent_data_params[i].response_slot_count,
-               buf->len);
-	}
+        if (DEBUG_VERBOSE) {
+            printk("SE%d: len=%d\n", i, buf->len);
+        }
+    }
 
-	err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
-	if (err) {
-		printk("Failed to set subevent data (err %d)\n", err);
-	} else {
-		printk("Subevent data set successfully, counter=%d\n", counter);
-	}
+    err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
+    if (err) {
+        printk("Failed to set subevent data (err %d)\n", err);
+    } else if (DEBUG_VERBOSE) {
+        printk("Data set OK, counter=%d\n", counter);
+    }
 }
 
 static bool print_ad_field(struct bt_data *data, void *user_data)
