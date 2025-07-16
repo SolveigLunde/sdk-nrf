@@ -10,16 +10,21 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
+#include <stdio.h>
+
 
 /* Add throughput measurement variables */
 static uint32_t total_bytes;
 static uint64_t stamp;
 #define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
+#define DEBUG_VERBOSE 0
 
-#define NUM_RSP_SLOTS 20
+#define NUM_RSP_SLOTS 33
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
 #define NAME_LEN      30
+
+#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
 
 static K_SEM_DEFINE(sem_connected, 0, 1);
 static K_SEM_DEFINE(sem_discovered, 0, 1);
@@ -37,14 +42,13 @@ static struct bt_uuid_128 pawr_char_uuid =
 	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
 static uint16_t pawr_attr_handle;
 static const struct bt_le_per_adv_param per_adv_params = {
-	.interval_min = 0x50,  /* 80 * 1.25ms = 100ms - reduced for more frequent events */
-	.interval_max = 0x50,  /* Keep same as min for consistent timing */
-	.options = 0,
+	.interval_min = 0x40,  /* 48 * 1.25ms = 60ms */
+	.interval_max = 0x40,  /* Keep same as min for consistent timing */
+	.options = BT_LE_ADV_OPT_USE_TX_POWER,  /* Include TX power in advertising PDU */
 	.num_subevents = NUM_SUBEVENTS,
-	/* Optimized timing for 20 response slots */
-	.subevent_interval = 0x18,  /* 24 * 1.25ms = 30ms - reduced but still sufficient */
-	.response_slot_delay = 0x4,  /* 4 * 1.25ms = 5ms - slightly reduced */
-	.response_slot_spacing = 0x10,  /* 16 * 0.125ms = 2ms - reduced for tighter spacing */
+	.subevent_interval = 0x30,  /* 32 * 1.25ms = 40ms - increased for more processing time */
+	.response_slot_delay = 0x0C,  /* 12 * 1.25ms = 15ms - optimized for more slots */
+	.response_slot_spacing = 0x03,  /* 3 * 0.125ms = 0.375ms - optimized for more slots */
 	.num_response_slots = NUM_RSP_SLOTS,
 };
 
@@ -55,33 +59,75 @@ static uint8_t backing_store[NUM_SUBEVENTS][PACKET_SIZE];
 BUILD_ASSERT(ARRAY_SIZE(bufs) == ARRAY_SIZE(subevent_data_params));
 BUILD_ASSERT(ARRAY_SIZE(backing_store) == ARRAY_SIZE(subevent_data_params));
 
-static uint8_t counter;
+// Add bitmap to track response slots
+static uint32_t response_bitmap = 0;  // Bitmap to track which slots have responded
+static uint32_t expected_responses = 0;  // Bitmap of expected responses (all slots with synced devices)
 
 static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_data_request *request)
 {
-	int err;
-	uint8_t to_send;
-	struct net_buf_simple *buf;
+    int err;
+    uint8_t to_send;
+    struct net_buf_simple *buf;
 
-	to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
+    if (!request) {
+        printk("Error: NULL request received\n");
+        return;
+    }
 
-	for (size_t i = 0; i < to_send; i++) {
-		buf = &bufs[i];
-		buf->data[buf->len - 1] = counter++;
+    to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
 
-		subevent_data_params[i].subevent =
-			(request->start + i) % per_adv_params.num_subevents;
-		subevent_data_params[i].response_slot_start = 0;
-		subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
-		subevent_data_params[i].data = buf;
-	}
+    // Calculate retransmission bitmap (bits set for slots that didn't respond)
+    uint32_t retransmit_bitmap = expected_responses & (~response_bitmap);
+    
+    // Debug: print empty slots
+    if (retransmit_bitmap) {
+        printk("Empty response slots detected: 0x%08X\n", retransmit_bitmap);
+        for (int slot = 0; slot < NUM_RSP_SLOTS; slot++) {
+            if (retransmit_bitmap & (1 << slot)) {
+                printk("  Slot %d: packet lost\n", slot);
+            }
+        }
+    }
 
-	err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
-	if (err) {
-		printk("Failed to set subevent data (err %d)\n", err);
-	} else {
-		printk("Subevent data set %d\n", counter);
-	}
+    // Clear response bitmap for next cycle
+    response_bitmap = 0;
+
+    // Process each subevent
+    for (size_t i = 0; i < to_send; i++) {
+        buf = &bufs[i];
+        
+        // Reset buffer for each request
+        net_buf_simple_reset(buf);
+        
+        // Add manufacturer specific data with ACK bitmap
+        uint8_t *length_field = net_buf_simple_add(buf, 1);
+        net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
+        net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
+        
+        // Add retransmission bitmap (3 bytes for 33 slots)
+        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 0) & 0xFF);
+        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 8) & 0xFF);
+        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 16) & 0xFF);
+        
+        // Update length field (excluding the length byte itself)
+        *length_field = buf->len - 1;
+
+        subevent_data_params[i].subevent = request->start + i;
+        subevent_data_params[i].response_slot_start = 0;
+        subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
+        subevent_data_params[i].data = buf;
+
+        if (DEBUG_VERBOSE) {
+            printk("SE%d: len=%d, retransmit_bitmap=0x%08X\n", i, buf->len, retransmit_bitmap);
+        }
+    }
+
+    err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
+    if (err) {
+        printk("Failed to set subevent data (err %d)\n", err);
+    } else if (DEBUG_VERBOSE) {
+        printk("Data set OK, retransmit_bitmap=0x%08X\n", retransmit_bitmap);
+    }
 }
 
 static bool print_ad_field(struct bt_data *data, void *user_data)
@@ -100,34 +146,52 @@ static bool print_ad_field(struct bt_data *data, void *user_data)
 
 static struct bt_conn *default_conn;
 
+
 static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response_info *info,
-		     struct net_buf_simple *buf)
+                     struct net_buf_simple *buf)
 {
-	int64_t delta;
+    int64_t delta;
 
-	if (buf) {
-		/* Initialize timestamp on first response */
-		if (total_bytes == 0) {
-			stamp = k_uptime_get_32();
-		}
+    if (buf) {
+        /* Initialize timestamp on first response */
+        if (total_bytes == 0) {
+            stamp = k_uptime_get_32();
+        }
 
-		total_bytes += buf->len;
-		
-		/* Print throughput every second */
-		if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
-			delta = k_uptime_delta(&stamp);
+        total_bytes += buf->len;
+        
+        // Mark this response slot as received
+        if (info->response_slot < NUM_RSP_SLOTS) {
+            response_bitmap |= (1 << info->response_slot);
+            
+            // Only expect responses after first successful response
+            if (!(expected_responses & (1 << info->response_slot))) {
+                expected_responses |= (1 << info->response_slot);
+                printk("Slot %d now actively responding\n", info->response_slot);
+            }
+        }
+        
+		//printk("Received response of length %d\n", buf->len);
+
+        if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
+            delta = k_uptime_delta(&stamp);
 			
-			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-			       total_bytes, total_bytes / 1024, 
-			       delta, ((uint64_t)total_bytes * 8 / delta));
-			
-			/* Reset counters for next interval */
-			total_bytes = 0;
-		}
 
-		printk("Response: subevent %d, slot %d\n", info->subevent, info->response_slot);
-		bt_data_parse(buf, print_ad_field, NULL);
-	}
+            printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
+                   total_bytes, total_bytes / 1024, 
+                   delta, ((uint64_t)total_bytes * 8 / delta));
+			FILE *log = fopen("throughput.log", "a");
+			if (log) {
+				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",total_bytes, 
+					total_bytes / 1024, delta, ((uint64_t)total_bytes * 8 / delta));
+				fclose(log);
+			}
+            total_bytes = 0;
+        }
+
+        printk("Response: subevent %d, slot %d\n", info->subevent, info->response_slot);
+        bt_data_parse(buf, print_ad_field, NULL);
+    }
 }
 
 static const struct bt_le_ext_adv_cb adv_cb = {
@@ -261,15 +325,20 @@ static void write_func(struct bt_conn *conn, uint8_t err, struct bt_gatt_write_p
 
 void init_bufs(void)
 {
-	for (size_t i = 0; i < ARRAY_SIZE(backing_store); i++) {
-		backing_store[i][0] = ARRAY_SIZE(backing_store[i]) - 1;
-		backing_store[i][1] = BT_DATA_MANUFACTURER_DATA;
-		backing_store[i][2] = 0x59; /* Nordic */
-		backing_store[i][3] = 0x00;
-
-		net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
-					      ARRAY_SIZE(backing_store[i]));
-	}
+    for (size_t i = 0; i < ARRAY_SIZE(backing_store); i++) {
+        /* Initialize the buffer first */
+        net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
+                                  ARRAY_SIZE(backing_store[i]));
+        
+        net_buf_simple_reset(&bufs[i]);
+        
+        /* Add manufacturer specific data */
+        net_buf_simple_add_u8(&bufs[i], 3); /* Length of manufacturer data */
+        net_buf_simple_add_u8(&bufs[i], BT_DATA_MANUFACTURER_DATA);
+        net_buf_simple_add_le16(&bufs[i], 0x0059); /* Nordic Company ID */
+        
+        printk("Buffer %d initialized with len %d\n", i, bufs[i].len);
+    }
 }
 
 #define MAX_SYNCS (NUM_SUBEVENTS * NUM_RSP_SLOTS)
