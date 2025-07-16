@@ -19,7 +19,7 @@ static uint64_t stamp;
 #define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
 #define DEBUG_VERBOSE 0
 
-#define NUM_RSP_SLOTS 33
+#define NUM_RSP_SLOTS 20
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
 #define NAME_LEN      30
@@ -47,8 +47,8 @@ static const struct bt_le_per_adv_param per_adv_params = {
 	.options = BT_LE_ADV_OPT_USE_TX_POWER,  /* Include TX power in advertising PDU */
 	.num_subevents = NUM_SUBEVENTS,
 	.subevent_interval = 0x30,  /* 32 * 1.25ms = 40ms - increased for more processing time */
-	.response_slot_delay = 0x0C,  /* 12 * 1.25ms = 15ms - optimized for more slots */
-	.response_slot_spacing = 0x03,  /* 3 * 0.125ms = 0.375ms - optimized for more slots */
+	.response_slot_delay = 0x18,  /* 16 * 1.25ms = 20ms - increased to ensure proper setup */
+	.response_slot_spacing = 0x04,  /* 8 * 0.125ms = 1ms - increased spacing between slots */
 	.num_response_slots = NUM_RSP_SLOTS,
 };
 
@@ -104,7 +104,7 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
         
-        // Add retransmission bitmap (3 bytes for 33 slots)
+        // Add retransmission bitmap (3 bytes for 20 slots)
         net_buf_simple_add_u8(buf, (retransmit_bitmap >> 0) & 0xFF);
         net_buf_simple_add_u8(buf, (retransmit_bitmap >> 8) & 0xFF);
         net_buf_simple_add_u8(buf, (retransmit_bitmap >> 16) & 0xFF);
