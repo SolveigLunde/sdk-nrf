@@ -6,20 +6,20 @@
 
  #include <zephyr/bluetooth/att.h>
  #include <zephyr/bluetooth/bluetooth.h>
- #include <zephyr/bluetooth/conn.h>
  #include <zephyr/bluetooth/gatt.h>
  #include <zephyr/bluetooth/hci.h>
  #include <zephyr/kernel.h>
  #include <stdio.h>
- 
- 
- /* Add throughput measurement variables */
+ #include <stdint.h>
+
+
  static uint32_t total_bytes;
  static uint64_t stamp;
  #define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
  #define DEBUG_VERBOSE 0
  
- #define NUM_RSP_SLOTS 70
+ /* Configuration from Kconfig */
+ #define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
  #define NUM_SUBEVENTS 1
  #define PACKET_SIZE   251
  #define NAME_LEN      30
@@ -42,45 +42,49 @@
 	 BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
  static uint16_t pawr_attr_handle;
 
- #include <stdint.h>
-#include <zephyr/sys/util.h> // For CLAMP
 
-void calculate_pawr_params(struct bt_le_per_adv_param *params,
-                           uint8_t num_subevents,
-                           uint8_t num_response_slots,
-                           uint8_t slot_spacing_units,   // 1 unit = 0.125ms
-                           uint8_t delay_units,          // 1 unit = 1.25ms
-                           uint8_t overhead_ms           // extra buffer time
-                           )
+
+void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
-    uint32_t total_subevent_time_ms = delay_units * 1.25 +
-                                      num_response_slots * slot_spacing_units * 0.125;
+	const uint8_t MIN_RESPONSE_SLOT_SPACING_UNITS = 4;   
+	const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 8;     
+	const uint8_t MARGIN_MS = 10;
 
-    uint32_t total_airtime_ms = num_subevents * total_subevent_time_ms + overhead_ms;
+	uint8_t slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS;
+	uint8_t delay = MIN_RESPONSE_SLOT_DELAY_UNITS;
 
-    uint16_t interval_units = (uint16_t)(total_airtime_ms / 1.25);
+	float total_time_ms = delay * 1.25 + num_response_slots * slot_spacing * 0.125 + MARGIN_MS;
+	uint8_t subevent_interval = (uint8_t)((total_time_ms * 1000 + 1249) / 1250);
 
-    interval_units = CLAMP(interval_units, 80, 65535); // Enforce valid range
+	// Clamp to BLE spec limits and respect configured interval
+	subevent_interval = CLAMP(subevent_interval, 6, 255);
+	uint16_t configured_interval = CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS / 1.25;
+	if (configured_interval > subevent_interval) {
+		subevent_interval = MIN(configured_interval, 255);
+	}
 
-    params->interval_min = interval_units;
-    params->interval_max = interval_units;
-    params->num_subevents = num_subevents;
-    params->subevent_interval = (uint8_t)(total_subevent_time_ms / 1.25);
-    params->response_slot_delay = delay_units;
-    params->response_slot_spacing = slot_spacing_units;
-    params->num_response_slots = num_response_slots;
+	params->interval_min = subevent_interval;
+	params->interval_max = subevent_interval;
+	params->num_subevents = 1;
+	params->subevent_interval = subevent_interval;
+	params->response_slot_delay = delay;
+	params->response_slot_spacing = slot_spacing;
+	params->num_response_slots = num_response_slots;
+
+	printk("PAwR config: %u slots, spacing=%.2fms, delay=%.2fms, interval=%.2fms\n",
+			num_response_slots,
+			slot_spacing * 0.125,
+			delay * 1.25,
+			subevent_interval * 1.25);
 }
+
 
  static struct bt_le_per_adv_param per_adv_params;
 
  void init_adv_params(void) {
-    calculate_pawr_params(&per_adv_params,
-                          NUM_SUBEVENTS,
-                          NUM_RSP_SLOTS,
-                          4,      // 0.5ms spacing (reduced from 1ms)
-                          8,      // 10ms delay (reduced from 20ms)
-                          5);     // 5ms overhead (reduced from 10ms)
+    calculate_pawr_params(&per_adv_params,NUM_RSP_SLOTS);
 }
+
  static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
  static struct net_buf_simple bufs[NUM_SUBEVENTS];
  static uint8_t backing_store[NUM_SUBEVENTS][PACKET_SIZE];
@@ -171,8 +175,6 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params,
  
 		 total_bytes += buf->len;
 		 
-		 //printk("Received response of length %d\n", buf->len);
- 
 		 if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
 			 delta = k_uptime_delta(&stamp);
 			 

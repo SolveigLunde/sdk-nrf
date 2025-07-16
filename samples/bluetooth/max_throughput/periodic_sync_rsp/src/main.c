@@ -7,13 +7,8 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <zephyr/bluetooth/hci.h>
-#include <zephyr/sys/util.h>
-
 
 #define NAME_LEN 30
-/* Add debug control */
 #define DEBUG_VERBOSE 0  /* Set to 1 for verbose debugging */
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
@@ -37,7 +32,7 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     int err;
 
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-    printk("Synced to %s with %d subevents\n", le_addr, info->num_subevents);
+    printk("[SYNC]Synced to %s with %d subevents\n", le_addr, info->num_subevents);
 
     default_sync = sync;
 
@@ -48,9 +43,9 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
 
     err = bt_le_per_adv_sync_subevent(sync, &params);
     if (err) {
-        printk("Failed to set subevents (err %d)\n", err);
+        printk("[SYNC]Failed to set subevents (err %d)\n", err);
     } else {
-        printk("Changed sync to subevent %d\n", subevents[0]);
+        printk("[SYNC] Changed sync to subevent %d\n", subevents[0]);
     }
 
     k_sem_give(&sem_per_sync);
@@ -64,7 +59,7 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
 
     if (DEBUG_VERBOSE) {
-        printk("Sync terminated from %s (reason %d)\n", le_addr, info->reason);
+        printk("[SYNC] Sync terminated from %s (reason %d)\n", le_addr, info->reason);
     }
 
     default_sync = NULL;
@@ -84,9 +79,6 @@ static bool print_ad_field(struct bt_data *data, void *user_data)
     return true;
 }
 
-int bt_le_per_adv_set_response_data(struct bt_le_per_adv_sync *per_adv_sync,
-				    const struct bt_le_per_adv_response_params *params,
-				    const struct net_buf_simple *data);
 
 static struct bt_le_per_adv_response_params rsp_params;
 
@@ -185,7 +177,7 @@ BT_GATT_SERVICE_DEFINE(pawr_svc, BT_GATT_PRIMARY_SERVICE(&pawr_svc_uuid.uuid),
 static void connected(struct bt_conn *conn, uint8_t err)
 {
     if (err) {
-        printk("Failed to connect (err 0x%02X)\n", err);
+        printk("[SYNC]Failed to connect (err 0x%02X)\n", err);
         default_conn = NULL;
         return;
     }
@@ -199,7 +191,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     default_conn = NULL;
 
     if (DEBUG_VERBOSE) {
-        printk("Disconnected (reason 0x%02X)\n", reason);
+        printk("[SYNC]Disconnected (reason 0x%02X)\n", reason);
     }
 }
 

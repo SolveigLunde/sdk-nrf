@@ -1,7 +1,14 @@
 #!/bin/bash
 
 # === CONFIGURATION ===
-NUM_SYNCHRONIZERS=70  # Change this number as needed
+# Get number of devices from Kconfig
+CONFIG_FILE="periodic_adv_rsp/build_p/periodic_adv_rsp/zephyr/.config"
+if [ -f "$CONFIG_FILE" ]; then
+    NUM_SYNCHRONIZERS=$(grep "CONFIG_BT_MAX_THROUGHPUT_DEVICES=" "$CONFIG_FILE" | cut -d'=' -f2)
+else
+    echo "Error: Config file not found. Please build the project first."
+    exit 1
+fi
 
 # === CLEANUP ===
 echo "Cleaning up /tmp/bs_azure/..."

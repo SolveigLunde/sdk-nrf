@@ -1,0 +1,31 @@
+# Copyright (c) 2024 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Maximum Throughput Sample"
+
+config MAX_THROUGHPUT
+	bool "Maximum Throughput Sample Settings"
+	default y
+	help
+		Enable configuration options for maximum throughput sample
+
+config BT_MAX_THROUGHPUT_DEVICES
+	int "Number of PAwR scanner devices"
+	default 20
+	range 1 50
+	depends on MAX_THROUGHPUT
+	help
+		Number of scanner devices that will participate in the PAwR communication.
+		This affects memory usage and timing calculations.
+		IMPORTANT: This value must match the NUM_SYNCHRONIZERS in run_devices.sh
+
+config BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS
+	int "PAwR advertising interval (ms)"
+	default 100
+	range 20 1000
+	depends on MAX_THROUGHPUT
+	help
+		Interval between periodic advertising events in milliseconds.
+		Lower values increase throughput but consume more power.
+
+source "Kconfig.zephyr" 
