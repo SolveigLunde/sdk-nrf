@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # === CONFIGURATION ===
-NUM_SYNCHRONIZERS=20  # Change this number as needed
+NUM_SYNCHRONIZERS=70  # Change this number as needed
 
 # === CLEANUP ===
 echo "Cleaning up /tmp/bs_azure/..."

@@ -11,6 +11,7 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/sys/util.h>
 
+
 #define NAME_LEN 30
 /* Add debug control */
 #define DEBUG_VERBOSE 0  /* Set to 1 for verbose debugging */
@@ -27,7 +28,8 @@ static struct __packed {
 
 } pawr_timing;
 
-static void sync_cb(struct bt_le_per_adv_sync *sync, struct bt_le_per_adv_sync_synced_info *info)
+static void sync_cb(struct bt_le_per_adv_sync *sync, 
+                   struct bt_le_per_adv_sync_synced_info *info)
 {
     struct bt_le_per_adv_sync_subevent_params params;
     uint8_t subevents[1];
@@ -116,7 +118,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
         if (err) {
             printk("Failed to send response (err %d)\n", err);
         }
-
     } else if (buf) {
         if (DEBUG_VERBOSE) {
             printk("Empty indication on subevent %d\n", info->subevent);
