@@ -183,6 +183,20 @@ static void connected(struct bt_conn *conn, uint8_t err)
     }
 
     default_conn = bt_conn_ref(conn);
+
+    /* Accept 2M PHY if requested */
+    struct bt_conn_le_phy_param phy_param = {
+        .options = BT_CONN_LE_PHY_OPT_NONE,
+        .pref_tx_phy = BT_GAP_LE_PHY_2M,
+        .pref_rx_phy = BT_GAP_LE_PHY_2M,
+    };
+    
+    err = bt_conn_le_phy_update(conn, &phy_param);
+    if (err) {
+        printk("[SYNC] PHY update request failed (err %d)\n", err);
+    } else {
+        printk("[SYNC] PHY update request sent\n");
+    }
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -195,9 +209,33 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     }
 }
 
+static const char *phy_to_str(uint8_t phy)
+{
+    switch (phy) {
+    case BT_GAP_LE_PHY_1M:
+        return "LE 1M";
+    case BT_GAP_LE_PHY_2M:
+        return "LE 2M";
+    case BT_GAP_LE_PHY_CODED:
+        return "LE Coded";
+    default:
+        return "Unknown";
+    }
+}
+
+static void le_param_updated(struct bt_conn *conn, uint16_t interval,
+                           uint16_t latency, uint16_t timeout)
+{
+    if (DEBUG_VERBOSE) {
+        printk("[SYNC] Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
+               interval * 1.25f, latency, timeout * 10);
+    }
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
+    .le_param_updated = le_param_updated,
 };
 
 static const struct bt_data ad[] = {

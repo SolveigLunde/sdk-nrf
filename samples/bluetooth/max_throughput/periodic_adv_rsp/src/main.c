@@ -212,28 +212,62 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 		 default_conn = NULL;
 		 return;
 	 }
- 
- }
- 
- 
- void disconnected_cb(struct bt_conn *conn, uint8_t reason)
- {
-	 printk("Disconnected, reason 0x%02X %s\n", reason, bt_hci_err_to_str(reason));
- 
-	 k_sem_give(&sem_disconnected);
- }
- 
- void remote_info_available_cb(struct bt_conn *conn, struct bt_conn_remote_info *remote_info)
- {
-	 /* Need to wait for remote info before initiating PAST */
-	 k_sem_give(&sem_connected);
- }
- 
- BT_CONN_CB_DEFINE(conn_cb) = {
-	 .connected = connected_cb,
-	 .disconnected = disconnected_cb,
-	 .remote_info_available = remote_info_available_cb, 
- };
+
+	/* Request 2M PHY */
+	struct bt_conn_le_phy_param phy_param = {
+		.options = BT_CONN_LE_PHY_OPT_NONE,
+		.pref_tx_phy = BT_GAP_LE_PHY_2M,
+		.pref_rx_phy = BT_GAP_LE_PHY_2M,
+	};
+	
+	err = bt_conn_le_phy_update(conn, &phy_param);
+	if (err) {
+		printk("PHY update request failed (err %d)\n", err);
+	} else {
+		printk("PHY update request sent\n");
+	}
+}
+
+void disconnected_cb(struct bt_conn *conn, uint8_t reason)
+{
+	printk("Disconnected, reason 0x%02X %s\n", reason, bt_hci_err_to_str(reason));
+
+	k_sem_give(&sem_disconnected);
+}
+
+void remote_info_available_cb(struct bt_conn *conn, struct bt_conn_remote_info *remote_info)
+{
+	/* Need to wait for remote info before initiating PAST */
+	k_sem_give(&sem_connected);
+}
+
+static const char *phy_to_str(uint8_t phy)
+{
+	switch (phy) {
+	case BT_GAP_LE_PHY_1M:
+		return "LE 1M";
+	case BT_GAP_LE_PHY_2M:
+		return "LE 2M";
+	case BT_GAP_LE_PHY_CODED:
+		return "LE Coded";
+	default:
+		return "Unknown";
+	}
+}
+
+void le_param_updated(struct bt_conn *conn, uint16_t interval,
+                     uint16_t latency, uint16_t timeout)
+{
+    printk("Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
+           interval * 1.25f, latency, timeout * 10);
+}
+
+BT_CONN_CB_DEFINE(conn_cb) = {
+	.connected = connected_cb,
+	.disconnected = disconnected_cb,
+	.remote_info_available = remote_info_available_cb,
+	.le_param_updated = le_param_updated,
+};
  
  static bool data_cb(struct bt_data *data, void *user_data)
  {
