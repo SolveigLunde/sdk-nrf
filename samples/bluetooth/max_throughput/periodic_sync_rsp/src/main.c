@@ -4,352 +4,288 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/hci.h>
-#include <zephyr/kernel.h>
-#include <stdio.h>
+#include <zephyr/sys/util.h>
 
-/* Add throughput measurement variables */
-static uint32_t total_bytes;
-static uint64_t stamp;
-#define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
+#define NAME_LEN 30
+/* Add debug control */
+#define DEBUG_VERBOSE 0  /* Set to 1 for verbose debugging */
 
-#define PACKET_SIZE 251
+static K_SEM_DEFINE(sem_per_adv, 0, 1);
+static K_SEM_DEFINE(sem_per_sync, 0, 1);
+static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
-static struct bt_uuid_128 pawr_char_uuid =
-	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
+static struct bt_conn *default_conn;
+static struct bt_le_per_adv_sync *default_sync;
+static struct __packed {
+	uint8_t subevent;
+	uint8_t response_slot;
 
-static struct bt_gatt_service_static pawr_svc = BT_GATT_SERVICE_STATIC_DEFINE(
-	BT_GATT_PRIMARY_SERVICE(&pawr_char_uuid),
-	BT_GATT_CHARACTERISTIC(&pawr_char_uuid.uuid, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
-			       BT_GATT_PERM_WRITE, NULL, write_pawr_char, NULL));
+} pawr_timing;
 
-static struct bt_le_per_adv_sync *sync;
-static struct bt_le_per_adv_sync_subevent_params subevent_params;
-static uint8_t subevent_data[PACKET_SIZE];
-static uint8_t subevent;
-static uint8_t response_slot;
-
-static void subevent_data_cb(struct bt_le_per_adv_sync *sync,
-			     const struct bt_le_per_adv_sync_subevent_info *info,
-			     struct net_buf_simple *buf)
+static void sync_cb(struct bt_le_per_adv_sync *sync, struct bt_le_per_adv_sync_synced_info *info)
 {
-	printk("Subevent %d\n", info->subevent);
-	if (buf) {
-		printk("  tx_power: %d\n", info->tx_power);
-		printk("  rssi: %d\n", info->rssi);
-		printk("  cte_type: %d\n", info->cte_type);
-		printk("  data_status: %d\n", info->data_status);
-		printk("  data_len: %d\n", buf->len);
-		printk("  data: ");
-		for (int i = 0; i < buf->len; i++) {
-			printk("%02x ", buf->data[i]);
-		}
-		printk("\n");
-	}
-}
+    struct bt_le_per_adv_sync_subevent_params params;
+    uint8_t subevents[1];
+    char le_addr[BT_ADDR_LE_STR_LEN];
+    int err;
 
-static void sync_cb(struct bt_le_per_adv_sync *sync,
-		    struct bt_le_per_adv_sync_synced_info *info)
-{
-	printk("PER_ADV_SYNC[%d]: [DEVICE]: %s synced, "
-	       "Interval 0x%04x (%u us), PHY %s\n",
-	       bt_le_per_adv_sync_get_index(sync), bt_addr_le_str(&info->addr),
-	       info->interval, BT_CONN_INTERVAL_TO_US(info->interval),
-	       phy_str(info->phy));
+    bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
+    printk("Synced to %s with %d subevents\n", le_addr, info->num_subevents);
+
+    default_sync = sync;
+
+    params.properties = 0;
+    params.num_subevents = 1;
+    params.subevents = subevents;
+    subevents[0] = pawr_timing.subevent;
+
+    err = bt_le_per_adv_sync_subevent(sync, &params);
+    if (err) {
+        printk("Failed to set subevents (err %d)\n", err);
+    } else {
+        printk("Changed sync to subevent %d\n", subevents[0]);
+    }
+
+    k_sem_give(&sem_per_sync);
 }
 
 static void term_cb(struct bt_le_per_adv_sync *sync,
-		    const struct bt_le_per_adv_sync_term_info *info)
+                   const struct bt_le_per_adv_sync_term_info *info)
 {
-	printk("PER_ADV_SYNC[%d]: [DEVICE]: %s sync terminated\n",
-	       bt_le_per_adv_sync_get_index(sync), bt_addr_le_str(&info->addr));
+    char le_addr[BT_ADDR_LE_STR_LEN];
+
+    bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
+
+    if (DEBUG_VERBOSE) {
+        printk("Sync terminated from %s (reason %d)\n", le_addr, info->reason);
+    }
+
+    default_sync = NULL;
+
+    k_sem_give(&sem_per_sync_lost);
 }
+
+static bool print_ad_field(struct bt_data *data, void *user_data)
+{
+    if (DEBUG_VERBOSE) {
+        printk("[SYNC] AD type 0x%02X: ", data->type);
+        for (size_t i = 0; i < data->data_len; i++) {
+            printk("%02X", data->data[i]);
+        }
+        printk("\n");
+    }
+    return true;
+}
+
+int bt_le_per_adv_set_response_data(struct bt_le_per_adv_sync *per_adv_sync,
+				    const struct bt_le_per_adv_response_params *params,
+				    const struct net_buf_simple *data);
+
+static struct bt_le_per_adv_response_params rsp_params;
+
+NET_BUF_SIMPLE_DEFINE_STATIC(rsp_buf, 247);
 
 static void recv_cb(struct bt_le_per_adv_sync *sync,
-		    const struct bt_le_per_adv_sync_recv_info *info,
-		    struct net_buf_simple *buf)
+                   const struct bt_le_per_adv_sync_recv_info *info,
+                   struct net_buf_simple *buf)
 {
-	int64_t delta;
-	
-	if (buf) {
-		/* Initialize timestamp on first response */
-		if (total_bytes == 0) {
-			stamp = k_uptime_get_32();
-		}
+    int err;
 
-		total_bytes += buf->len;
-		
-		/* Print throughput every second */
-		if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
-			delta = k_uptime_delta(&stamp);
-			
-			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-			       total_bytes, total_bytes / 1024, 
-			       delta, ((uint64_t)total_bytes * 8 / delta));
-			
-			FILE *log = fopen("throughput.log", "a");
-			if (log) {
-				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-				       total_bytes, total_bytes / 1024, 
-				       delta, ((uint64_t)total_bytes * 8 / delta));
-				fclose(log);
-			}
-			
-			/* Reset counters for next interval */
-			total_bytes = 0;
-		}
+    if (buf && buf->len) {
+        /* Parse manufacturer data to extract retransmission bitmap */
+        if (buf->len >= 7) {  // Minimum length for our format
+            uint8_t *data = buf->data;
+            
+            // Check if this is manufacturer data with Nordic Company ID
+            if (data[0] >= 6 &&  // Length field
+                data[1] == BT_DATA_MANUFACTURER_DATA &&
+                data[2] == 0x59 && data[3] == 0x00) {  // Nordic Company ID (little endian)
+                
+                // Extract retransmission bitmap (3 bytes after company ID)
+                uint32_t retransmit_bitmap = 0;
+                retransmit_bitmap |= (uint32_t)data[4] << 0;
+                retransmit_bitmap |= (uint32_t)data[5] << 8;
+                retransmit_bitmap |= (uint32_t)data[6] << 16;
+                
+                // Check if our response slot bit is set (means we need to retransmit)
+                if (retransmit_bitmap & (1 << pawr_timing.response_slot)) {
+                    printk("RETRANSMIT: Slot %d told to retransmit (bitmap=0x%08X)\n", 
+                           pawr_timing.response_slot, retransmit_bitmap);
+                }
+            }
+        }
+        
+        /* Echo the data back to the advertiser */
+        net_buf_simple_reset(&rsp_buf);
+        net_buf_simple_add_mem(&rsp_buf, buf->data, buf->len);
 
-		printk("Received %d bytes\n", buf->len);
-		
-		// Parse manufacturer data to check for retransmission bitmap
-		if (buf->len >= 7) { // Minimum length for manufacturer data with bitmap
-			uint8_t *data = buf->data;
-			uint8_t length = data[0];
-			uint8_t type = data[1];
-			uint16_t company_id = (data[3] << 8) | data[2];
-			
-			if (type == BT_DATA_MANUFACTURER_DATA && company_id == 0x0059) {
-				// Parse bitmap (3 bytes starting at offset 4)
-				uint32_t bitmap = (data[6] << 16) | (data[5] << 8) | data[4];
-				
-				// Check if our slot bit is set (indicating we should retransmit)
-				if (bitmap & (1 << response_slot)) {
-					printk("Synchronizer told to retransmit (slot %d, bitmap=0x%08X)\n", 
-					       response_slot, bitmap);
-				}
-			}
-		}
-	}
-}
+        rsp_params.request_event = info->periodic_event_counter;
+        rsp_params.request_subevent = info->subevent;
+        rsp_params.response_subevent = info->subevent;
+        rsp_params.response_slot = pawr_timing.response_slot;
 
-static void biginfo_cb(struct bt_le_per_adv_sync *sync,
-		       const struct bt_iso_biginfo *biginfo)
-{
-	printk("BIG INFO report received\n");
-}
+        printk("Indication: subevent %d, responding in slot %d\n", 
+               info->subevent, pawr_timing.response_slot);
+        if (DEBUG_VERBOSE) {
+            bt_data_parse(buf, print_ad_field, NULL);
+        }
 
-static void cte_report_cb(struct bt_le_per_adv_sync *sync,
-			  struct bt_df_per_adv_sync_iq_samples_report const *report)
-{
-	printk("CTE report received\n");
+        err = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
+        if (err) {
+            printk("Failed to send response (err %d)\n", err);
+        }
+
+    } else if (buf) {
+        if (DEBUG_VERBOSE) {
+            printk("Empty indication on subevent %d\n", info->subevent);
+        }
+    } else {
+        printk("Failed to receive on subevent %d\n", info->subevent);
+    }
 }
 
 static struct bt_le_per_adv_sync_cb sync_callbacks = {
 	.synced = sync_cb,
 	.term = term_cb,
 	.recv = recv_cb,
-	.biginfo = biginfo_cb,
-	.cte_report = cte_report_cb,
 };
 
-static void response_cb(struct bt_le_per_adv_sync *sync,
-			const struct bt_le_per_adv_sync_subevent_info *info,
-			struct bt_le_per_adv_sync_response_info *response_info,
-			struct net_buf_simple *buf)
+static const struct bt_uuid_128 pawr_svc_uuid =
+	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0));
+static const struct bt_uuid_128 pawr_char_uuid =
+	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
+
+static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf,
+			    uint16_t len, uint16_t offset, uint8_t flags)
 {
-	int err;
-
-	if (buf) {
-		printk("Response transmitted\n");
-	}
-
-	if (response_info->tx_status) {
-		printk("Response failed to transmit\n");
-	}
-
-	if (response_info->subevent != subevent) {
-		printk("Subevent mismatch, expected %d, got %d\n", subevent,
-		       response_info->subevent);
-	}
-
-	if (response_info->response_slot != response_slot) {
-		printk("Response slot mismatch, expected %d, got %d\n", response_slot,
-		       response_info->response_slot);
-	}
-
-	/* Configure the response for the next subevent */
-	subevent_params.subevent = subevent;
-	subevent_params.response_slot_start = response_slot;
-	subevent_params.response_slot_count = 1;
-	subevent_params.data_len = PACKET_SIZE;
-	subevent_params.data = subevent_data;
-
-	err = bt_le_per_adv_sync_subevent_response(sync, &subevent_params);
-	if (err) {
-		printk("Failed to set subevent response (err %d)\n", err);
-	}
-}
-
-static struct bt_le_per_adv_sync_cb subevent_callbacks = {
-	.synced = sync_cb,
-	.term = term_cb,
-	.recv = recv_cb,
-	.biginfo = biginfo_cb,
-	.cte_report = cte_report_cb,
-	.subevent_data = subevent_data_cb,
-	.response = response_cb,
-};
-
-static void connected_cb(struct bt_conn *conn, uint8_t err)
-{
-	printk("Connected (err 0x%02X)\n", err);
-
-	if (err) {
-		return;
-	}
-}
-
-static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
-{
-	printk("Disconnected, reason 0x%02X %s\n", reason, bt_hci_err_to_str(reason));
-}
-
-BT_CONN_CB_DEFINE(conn_cb) = {
-	.connected = connected_cb,
-	.disconnected = disconnected_cb,
-};
-
-static ssize_t write_pawr_char(struct bt_conn *conn, const struct bt_gatt_attr *attr,
-			       const void *buf, uint16_t len, uint16_t offset,
-			       uint8_t flags)
-{
-	int err;
-	struct pawr_timing *timing = (struct pawr_timing *)buf;
-
-	if (len != sizeof(*timing)) {
-		printk("Invalid length %d, expected %d\n", len, sizeof(*timing));
-		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
-	}
-
-	if (offset != 0) {
-		printk("Invalid offset %d, expected 0\n", offset);
+	if (offset) {
 		return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
 	}
 
-	subevent = timing->subevent;
-	response_slot = timing->response_slot;
+	if (len != sizeof(pawr_timing)) {
+		return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+	}
 
-	printk("Subevent %d, response slot %d\n", subevent, response_slot);
+	memcpy(&pawr_timing, buf, len);
 
-	/* Configure the response for the next subevent */
-	subevent_params.subevent = subevent;
-	subevent_params.response_slot_start = response_slot;
-	subevent_params.response_slot_count = 1;
-	subevent_params.data_len = PACKET_SIZE;
-	subevent_params.data = subevent_data;
+	if (DEBUG_VERBOSE) {
+		printk("[TIMING] New config SE:%d Slot:%d\n", 
+			   pawr_timing.subevent, pawr_timing.response_slot);
+	}
 
-	err = bt_le_per_adv_sync_subevent_response(sync, &subevent_params);
-	if (err) {
-		printk("Failed to set subevent response (err %d)\n", err);
+	struct bt_le_per_adv_sync_subevent_params params;
+	uint8_t subevents[1];
+	int err;
+
+	params.properties = 0;
+	params.num_subevents = 1;
+	params.subevents = subevents;
+	subevents[0] = pawr_timing.subevent;
+
+	if (default_sync) {
+		err = bt_le_per_adv_sync_subevent(default_sync, &params);
+		if (err) {
+			printk("[TIMING] Error: Failed to set subevents (err %d)\n", err);
+		}
+	} else if (DEBUG_VERBOSE) {
+		printk("[TIMING] Not synced yet\n");
 	}
 
 	return len;
 }
 
-#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
+BT_GATT_SERVICE_DEFINE(pawr_svc, BT_GATT_PRIMARY_SERVICE(&pawr_svc_uuid.uuid),
+		       BT_GATT_CHARACTERISTIC(&pawr_char_uuid.uuid, BT_GATT_CHRC_WRITE,
+					      BT_GATT_PERM_WRITE, NULL, write_timing,
+					      &pawr_timing));
 
-struct pawr_timing {
-	uint8_t subevent;
-	uint8_t response_slot;
-} __packed;
-
-static void past_received_cb(struct bt_conn *conn,
-			     const struct bt_le_per_adv_sync_transfer_received_info *info,
-			     struct bt_le_per_adv_sync *per_adv_sync)
+static void connected(struct bt_conn *conn, uint8_t err)
 {
-	printk("PAST received\n");
+    if (err) {
+        printk("Failed to connect (err 0x%02X)\n", err);
+        default_conn = NULL;
+        return;
+    }
 
-	sync = per_adv_sync;
-	bt_le_per_adv_sync_cb_register(sync, &subevent_callbacks);
+    default_conn = bt_conn_ref(conn);
 }
 
-static struct bt_le_per_adv_sync_transfer_cb past_cb = {
-	.received = past_received_cb,
+static void disconnected(struct bt_conn *conn, uint8_t reason)
+{
+    bt_conn_unref(default_conn);
+    default_conn = NULL;
+
+    if (DEBUG_VERBOSE) {
+        printk("Disconnected (reason 0x%02X)\n", reason);
+    }
+}
+
+BT_CONN_CB_DEFINE(conn_callbacks) = {
+    .connected = connected,
+    .disconnected = disconnected,
 };
 
-void init_subevent_data(void)
-{
-	/* Initialize subevent data */
-	subevent_data[0] = PACKET_SIZE - 1; /* Length */
-	subevent_data[1] = BT_DATA_MANUFACTURER_DATA;
-	subevent_data[2] = 0x59; /* Nordic */
-	subevent_data[3] = 0x00;
-
-	/* Fill remaining bytes with pattern */
-	for (int i = 4; i < PACKET_SIZE; i++) {
-		subevent_data[i] = i & 0xFF;
-	}
-}
-
-static char *phy_str(uint8_t phy)
-{
-	switch (phy) {
-	case BT_GAP_LE_PHY_1M: return "LE 1M";
-	case BT_GAP_LE_PHY_2M: return "LE 2M";
-	case BT_GAP_LE_PHY_CODED: return "LE Coded";
-	default: return "Unknown";
-	}
-}
+static const struct bt_data ad[] = {
+	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
+};
 
 int main(void)
 {
+	struct bt_le_per_adv_sync_transfer_param past_param;
 	int err;
-	struct bt_le_adv_param adv_param = {
-		.id = BT_ID_DEFAULT,
-		.sid = 0,
-		.secondary_max_skip = 0,
-		.options = BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_USE_NAME,
-		.interval_min = BT_GAP_ADV_FAST_INT_MIN_2,
-		.interval_max = BT_GAP_ADV_FAST_INT_MAX_2,
-		.peer = NULL,
-	};
-
-	init_subevent_data();
 
 	printk("Starting PAwR Sync Demo\n");
 
-	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(NULL);
 	if (err) {
-		printk("Bluetooth init failed (err %d)\n", err);
+		printk("[INIT] Error: Bluetooth init failed (err %d)\n", err);
 		return 0;
 	}
 
-	/* Register the service */
-	err = bt_gatt_service_register(&pawr_svc);
+	bt_le_per_adv_sync_cb_register(&sync_callbacks);
+
+	past_param.skip = 1;
+	past_param.timeout = 1000; /* 10 seconds */
+	past_param.options = BT_LE_PER_ADV_SYNC_TRANSFER_OPT_NONE;
+	err = bt_le_per_adv_sync_transfer_subscribe(NULL, &past_param);
 	if (err) {
-		printk("GATT service register failed (err %d)\n", err);
+		printk("[INIT] Error: PAST subscribe failed (err %d)\n", err);
 		return 0;
 	}
 
-	/* Initialize advertising data */
-	struct bt_data ad[] = {
-		BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-		BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1)),
-	};
+	do {
+		err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
+		if (err && err != -EALREADY) {
+			printk("[ADV] Error: Failed to start (err %d)\n", err);
+			return 0;
+		}
 
-	struct bt_data sd[] = {
-		BT_DATA(BT_DATA_NAME_COMPLETE, "PAwR sync sample", 16),
-	};
+		printk("[SYNC] Waiting for sync...\n");
+		err = k_sem_take(&sem_per_sync, K_SECONDS(10));
+		if (err) {
+			printk("[SYNC] Error: Timeout while syncing\n");
+			continue;
+		}
 
-	err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
-	if (err) {
-		printk("Advertising failed to start (err %d)\n", err);
-		return 0;
-	}
+		if (DEBUG_VERBOSE) {
+			printk("[SYNC] Established\n");
+		}
 
-	/* Register PAST callback */
-	bt_le_per_adv_sync_transfer_cb_register(&past_cb);
+		err = k_sem_take(&sem_per_sync_lost, K_FOREVER);
+		if (err) {
+			printk("[SYNC] Error: Failed (err %d)\n", err);
+			return 0;
+		}
 
-	printk("Advertising successfully started\n");
-
-	while (true) {
-		k_sleep(K_SECONDS(1));
-	}
+		if (DEBUG_VERBOSE) {
+			printk("[SYNC] Lost\n");
+		}
+	} while (true);
 
 	return 0;
 }
