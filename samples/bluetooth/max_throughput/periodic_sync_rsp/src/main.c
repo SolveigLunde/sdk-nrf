@@ -7,8 +7,12 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/uuid.h>
+#include <zephyr/bluetooth/hci.h>
+#include <zephyr/sys/util.h>
 
 #define NAME_LEN 30
+/* Add debug control */
 #define DEBUG_VERBOSE 0  /* Set to 1 for verbose debugging */
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
@@ -91,6 +95,29 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
     int err;
 
     if (buf && buf->len) {
+        /* Parse manufacturer data to extract retransmission bitmap */
+        if (buf->len >= 7) {  // Minimum length for our format
+            uint8_t *data = buf->data;
+            
+            // Check if this is manufacturer data with Nordic Company ID
+            if (data[0] >= 6 &&  // Length field
+                data[1] == BT_DATA_MANUFACTURER_DATA &&
+                data[2] == 0x59 && data[3] == 0x00) {  // Nordic Company ID (little endian)
+                
+                // Extract retransmission bitmap (3 bytes after company ID)
+                uint32_t retransmit_bitmap = 0;
+                retransmit_bitmap |= (uint32_t)data[4] << 0;
+                retransmit_bitmap |= (uint32_t)data[5] << 8;
+                retransmit_bitmap |= (uint32_t)data[6] << 16;
+                
+                // Check if our response slot bit is set (means we need to retransmit)
+                if (retransmit_bitmap & (1 << pawr_timing.response_slot)) {
+                    printk("RETRANSMIT: Slot %d told to retransmit (bitmap=0x%08X)\n", 
+                           pawr_timing.response_slot, retransmit_bitmap);
+                }
+            }
+        }
+        
         /* Echo the data back to the advertiser */
         net_buf_simple_reset(&rsp_buf);
         net_buf_simple_add_mem(&rsp_buf, buf->data, buf->len);
