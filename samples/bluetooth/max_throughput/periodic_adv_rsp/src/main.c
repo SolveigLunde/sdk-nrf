@@ -48,14 +48,7 @@ static uint16_t pawr_attr_handle;
 
 #define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
 
-static K_SEM_DEFINE(sem_connected, 0, 1);
-static K_SEM_DEFINE(sem_discovered, 0, 1);
-static K_SEM_DEFINE(sem_written, 0, 1);
-static K_SEM_DEFINE(sem_disconnected, 0, 1);
 
-static struct bt_uuid_128 pawr_char_uuid =
-	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
-static uint16_t pawr_attr_handle;
 /*
 static const struct bt_le_per_adv_param per_adv_params = {
 	.interval_min = 0x40,  //48 * 1.25ms = 60ms 
@@ -316,7 +309,7 @@ void le_param_updated(struct bt_conn *conn, uint16_t interval,
                      uint16_t latency, uint16_t timeout)
 {
     printk("Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
-           interval * 1.25f, latency, timeout * 10);
+           interval * 1.25, latency, timeout * 10);
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
@@ -325,7 +318,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
 	.remote_info_available = remote_info_available_cb,
 	.le_param_updated = le_param_updated,
 };
-//BEGINNING OF CONFLICTING CODE
+
 
  
  static bool data_cb(struct bt_data *data, void *user_data)
