@@ -21,8 +21,8 @@ config BT_MAX_THROUGHPUT_DEVICES
 
 config BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS
 	int "PAwR advertising interval (ms)"
-	default 100
-	range 20 1000
+	default 200
+	range 20 2000
 	depends on MAX_THROUGHPUT
 	help
 		Interval between periodic advertising events in milliseconds.

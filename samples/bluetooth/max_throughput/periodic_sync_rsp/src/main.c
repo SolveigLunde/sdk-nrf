@@ -13,7 +13,13 @@
 
 #define NAME_LEN 30
 /* Add debug control */
-#define DEBUG_VERBOSE 0  /* Set to 1 for verbose debugging */
+// Configuration constants
+#define DEBUG_VERBOSE 0
+#define MAX_PAWR_RESPONSE_SIZE 247  // Maximum PAwR response packet size
+                                    // Must match advertiser's expected response size
+
+// BLE advertising data types
+#define BT_DATA_MANUFACTURER_DATA 0xFF  // Manufacturer-specific data type
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
@@ -104,33 +110,50 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
                 data[1] == BT_DATA_MANUFACTURER_DATA &&
                 data[2] == 0x59 && data[3] == 0x00) {  // Nordic Company ID (little endian)
                 
-                // Extract retransmission bitmap (3 bytes after company ID)
+                // Calculate bitmap size from packet length
+                uint8_t bitmap_bytes = data[0] - 5;  // Total length minus (type + company_id + length_byte)
+                
+                // Extract retransmission bitmap (variable length after company ID)
                 uint32_t retransmit_bitmap = 0;
-                retransmit_bitmap |= (uint32_t)data[4] << 0;
-                retransmit_bitmap |= (uint32_t)data[5] << 8;
-                retransmit_bitmap |= (uint32_t)data[6] << 16;
+                for (int i = 0; i < bitmap_bytes && i < 4; i++) {  // Limit to 32 bits for now
+                    retransmit_bitmap |= (uint32_t)data[4 + i] << (i * 8);
+                }
                 
                 // Check if our response slot bit is set (means we need to retransmit)
-                if (retransmit_bitmap & (1 << pawr_timing.response_slot)) {
-                    printk("RETRANSMIT: Slot %d told to retransmit (bitmap=0x%08X)\n", 
-                           pawr_timing.response_slot, retransmit_bitmap);
+                if (pawr_timing.response_slot < (bitmap_bytes * 8) && 
+                    (retransmit_bitmap & (1 << pawr_timing.response_slot))) {
+                    printk("RETRANSMIT: Slot %d told to retransmit (bitmap=0x%08X, %d bytes)\n", 
+                           pawr_timing.response_slot, retransmit_bitmap, bitmap_bytes);
                 }
             }
         }
         
-        /* Echo the data back to the advertiser */
+        /* Generate raw test data to bypass Nordic SDK buffer limitations */
         net_buf_simple_reset(&rsp_buf);
-        net_buf_simple_add_mem(&rsp_buf, buf->data, buf->len);
+        
+        // Fill the entire buffer with raw bytes - no headers, no structure
+        for (int i = 0; i < MAX_PAWR_RESPONSE_SIZE; i++) {
+            net_buf_simple_add_u8(&rsp_buf, pawr_timing.response_slot + i);
+        }
 
         rsp_params.request_event = info->periodic_event_counter;
         rsp_params.request_subevent = info->subevent;
         rsp_params.response_subevent = info->subevent;
         rsp_params.response_slot = pawr_timing.response_slot;
 
-        printk("Indication: subevent %d, responding in slot %d\n", 
-               info->subevent, pawr_timing.response_slot);
+        printk("Indication: subevent %d, responding in slot %d with %d bytes\n", 
+               info->subevent, pawr_timing.response_slot, rsp_buf.len);
         if (DEBUG_VERBOSE) {
             bt_data_parse(buf, print_ad_field, NULL);
+        } else {
+            // Show first few bytes of response data for verification
+            printk("  Sending: pattern=slot+offset, slot=%d, subevent=%d, len=%d\n", 
+                   pawr_timing.response_slot, info->subevent, rsp_buf.len);
+            printk("  First 8 bytes: ");
+            for (int i = 0; i < MIN(8, rsp_buf.len); i++) {
+                printk("%02X ", rsp_buf.data[i]);
+            }
+            printk("\n");
         }
 
         err = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
@@ -255,7 +278,7 @@ static void le_param_updated(struct bt_conn *conn, uint16_t interval,
 {
     if (DEBUG_VERBOSE) {
         printk("[SYNC] Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
-               interval * 1.25f, latency, timeout * 10);
+               interval * 1.25, latency, timeout * 10);
     }
 }
 

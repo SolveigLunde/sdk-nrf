@@ -27,8 +27,12 @@ static uint64_t stamp;
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
 #define NAME_LEN      30
+#define MAX_PAWR_RESPONSE_SIZE 247  // Expected response packet size
+
+// BLE advertising data types
+#define BT_DATA_MANUFACTURER_DATA 0xFF  // Manufacturer-specific data type
  
-#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
+//#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
  
 static K_SEM_DEFINE(sem_connected, 0, 1);
 static K_SEM_DEFINE(sem_discovered, 0, 1);
@@ -46,7 +50,6 @@ static struct bt_uuid_128 pawr_char_uuid =
 	BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
 static uint16_t pawr_attr_handle;
 
-#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
 
 
 /*
@@ -63,18 +66,39 @@ static const struct bt_le_per_adv_param per_adv_params = {
 */
 void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
-	const uint8_t MIN_RESPONSE_SLOT_SPACING_UNITS = 4;   
-	const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 8;     
-	const uint8_t MARGIN_MS = 10;
-
-	uint8_t slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS;
+	const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 8;     // 8 * 1.25ms = 10ms initial delay
+	const uint8_t MARGIN_MS = 10;                        // Extra margin for safety
+	const uint16_t TARGET_RESPONSE_SIZE_BYTES = 247;     // Target response packet size
+	const uint8_t PHY_RATE_MBPS = 1;                     // LE 1M PHY rate
+	
+	// Calculate time needed to transmit 247 bytes
+	// 247 bytes * 8 bits/byte = 1976 bits
+	// At 1 Mbps: 1976 microseconds = 1.976ms
+	float transmission_time_ms = (float)(TARGET_RESPONSE_SIZE_BYTES * 8) / (PHY_RATE_MBPS * 1000);
+	
+	// Add margin for processing, radio switching, etc. (50% margin)
+	float required_slot_time_ms = transmission_time_ms * 1.5;
+	
+	// Convert to spacing units (each unit = 0.125ms)
+	uint8_t slot_spacing = (uint8_t)((required_slot_time_ms + 0.124) / 0.125); // Round up
+	
+	// Ensure minimum spacing per BLE spec
+	if (slot_spacing < 4) {
+		slot_spacing = 4;
+	}
+	
 	uint8_t delay = MIN_RESPONSE_SLOT_DELAY_UNITS;
-
-	float total_time_ms = delay * 1.25 + num_response_slots * slot_spacing * 0.125 + MARGIN_MS;
-	uint8_t subevent_interval = (uint8_t)((total_time_ms * 1000 + 1249) / 1250);
-
-	// Clamp to BLE spec limits and respect configured interval
+	
+	// Calculate total time needed for all responses
+	float total_response_time_ms = delay * 1.25 + num_response_slots * slot_spacing * 0.125 + MARGIN_MS;
+	
+	// Convert to subevent interval units (1.25ms each)
+	uint8_t subevent_interval = (uint8_t)((total_response_time_ms + 1.249) / 1.25); // Round up
+	
+	// Clamp to BLE spec limits
 	subevent_interval = CLAMP(subevent_interval, 6, 255);
+	
+	// Check if configured interval is longer and use that instead
 	uint16_t configured_interval = CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS / 1.25;
 	if (configured_interval > subevent_interval) {
 		subevent_interval = MIN(configured_interval, 255);
@@ -88,11 +112,16 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 	params->response_slot_spacing = slot_spacing;
 	params->num_response_slots = num_response_slots;
 
-	printk("PAwR config: %u slots, spacing=%.2fms, delay=%.2fms, interval=%.2fms\n",
-			num_response_slots,
-			slot_spacing * 0.125,
-			delay * 1.25,
-			subevent_interval * 1.25);
+	// Enhanced debug output
+	float actual_interval_ms = subevent_interval * 1.25;
+	float slot_time_ms = slot_spacing * 0.125;
+	float total_throughput_bps = (num_response_slots * TARGET_RESPONSE_SIZE_BYTES * 8 * 1000) / actual_interval_ms;
+	
+	printk("PAwR optimized for %d-byte responses:\n", TARGET_RESPONSE_SIZE_BYTES);
+	printk("  %u devices, slot_time=%.2fms, delay=%.2fms\n", 
+		   num_response_slots, slot_time_ms, delay * 1.25);
+	printk("  interval=%.2fms, estimated throughput=%.0f bps (%.1f KB/s)\n",
+		   actual_interval_ms, total_throughput_bps, total_throughput_bps / 8192);
 }
 
 
@@ -109,9 +138,23 @@ static uint8_t backing_store[NUM_SUBEVENTS][PACKET_SIZE];
 BUILD_ASSERT(ARRAY_SIZE(bufs) == ARRAY_SIZE(subevent_data_params));
 BUILD_ASSERT(ARRAY_SIZE(backing_store) == ARRAY_SIZE(subevent_data_params));
 
-// Add bitmap to track response slots
-static uint32_t response_bitmap = 0;  // Bitmap to track which slots have responded
-static uint32_t expected_responses = 0;  // Bitmap of expected responses (all slots with synced devices)
+// Add bitmap to track response slots - now dynamic sized
+#define BITMAP_BYTES_NEEDED(num_devices) (((num_devices) + 7) / 8)
+static uint8_t response_bitmap[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVICES)];
+static uint8_t expected_responses[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVICES)];
+
+// Helper functions for bitmap operations
+static void bitmap_set_bit(uint8_t *bitmap, int bit) {
+    bitmap[bit / 8] |= (1 << (bit % 8));
+}
+
+static bool bitmap_test_bit(const uint8_t *bitmap, int bit) {
+    return (bitmap[bit / 8] & (1 << (bit % 8))) != 0;
+}
+
+static void bitmap_clear(uint8_t *bitmap, int num_bits) {
+    memset(bitmap, 0, BITMAP_BYTES_NEEDED(num_bits));
+}
 
 static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_data_request *request)
 {
@@ -127,20 +170,34 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
     to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
 
     // Calculate retransmission bitmap (bits set for slots that didn't respond)
-    uint32_t retransmit_bitmap = expected_responses & (~response_bitmap);
+    uint8_t bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
+    uint8_t retransmit_bitmap[bitmap_bytes];
+    
+    // retransmit_bitmap = expected_responses & (~response_bitmap)
+    for (int i = 0; i < bitmap_bytes; i++) {
+        retransmit_bitmap[i] = expected_responses[i] & (~response_bitmap[i]);
+    }
     
     // Debug: print empty slots
-    if (retransmit_bitmap) {
-        printk("Empty response slots detected: 0x%08X\n", retransmit_bitmap);
+    bool has_retransmits = false;
+    for (int i = 0; i < bitmap_bytes; i++) {
+        if (retransmit_bitmap[i] != 0) {
+            has_retransmits = true;
+            break;
+        }
+    }
+    
+    if (has_retransmits) {
+        printk("Empty response slots detected:\n");
         for (int slot = 0; slot < NUM_RSP_SLOTS; slot++) {
-            if (retransmit_bitmap & (1 << slot)) {
+            if (bitmap_test_bit(retransmit_bitmap, slot)) {
                 printk("  Slot %d: packet lost\n", slot);
             }
         }
     }
 
     // Clear response bitmap for next cycle
-    response_bitmap = 0;
+    bitmap_clear(response_bitmap, NUM_RSP_SLOTS);
 
     // Process each subevent
     for (size_t i = 0; i < to_send; i++) {
@@ -154,10 +211,10 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
         
-        // Add retransmission bitmap (3 bytes for 20 slots)
-        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 0) & 0xFF);
-        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 8) & 0xFF);
-        net_buf_simple_add_u8(buf, (retransmit_bitmap >> 16) & 0xFF);
+        // Add retransmission bitmap (dynamic size based on NUM_RSP_SLOTS)
+        for (int j = 0; j < bitmap_bytes; j++) {
+            net_buf_simple_add_u8(buf, retransmit_bitmap[j]);
+        }
         
         // Update length field (excluding the length byte itself)
         *length_field = buf->len - 1;
@@ -168,7 +225,11 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         subevent_data_params[i].data = buf;
 
         if (DEBUG_VERBOSE) {
-            printk("SE%d: len=%d, retransmit_bitmap=0x%08X\n", i, buf->len, retransmit_bitmap);
+            printk("SE%d: len=%d, retransmit_bitmap=", i, buf->len);
+            for (int k = 0; k < bitmap_bytes; k++) {
+                printk("%02X", retransmit_bitmap[k]);
+            }
+            printk("\n");
         }
     }
 
@@ -176,7 +237,11 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
     if (err) {
         printk("Failed to set subevent data (err %d)\n", err);
     } else if (DEBUG_VERBOSE) {
-        printk("Data set OK, retransmit_bitmap=0x%08X\n", retransmit_bitmap);
+        printk("Data set OK, retransmit_bitmap=");
+        for (int k = 0; k < bitmap_bytes; k++) {
+            printk("%02X", retransmit_bitmap[k]);
+        }
+        printk("\n");
     }
 }
 
@@ -212,11 +277,11 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
         
         // Mark this response slot as received
         if (info->response_slot < NUM_RSP_SLOTS) {
-            response_bitmap |= (1 << info->response_slot);
+            bitmap_set_bit(response_bitmap, info->response_slot);
             
             // Only expect responses after first successful response
-            if (!(expected_responses & (1 << info->response_slot))) {
-                expected_responses |= (1 << info->response_slot);
+            if (!bitmap_test_bit(expected_responses, info->response_slot)) {
+                bitmap_set_bit(expected_responses, info->response_slot);
                 printk("Slot %d now actively responding\n", info->response_slot);
             }
         }
@@ -239,8 +304,31 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
             total_bytes = 0;
         }
 
-        printk("Response: subevent %d, slot %d\n", info->subevent, info->response_slot);
-        bt_data_parse(buf, print_ad_field, NULL);
+        printk("Response: subevent %d, slot %d, size %d bytes\n", 
+               info->subevent, info->response_slot, buf->len);
+        if (DEBUG_VERBOSE) {
+            bt_data_parse(buf, print_ad_field, NULL);
+        } else {
+            // Analyze the simple test pattern: slot + offset
+            printk("  Expected pattern: slot %d + offset\n", info->response_slot);
+            printk("  Actual bytes: ");
+            for (int i = 0; i < MIN(10, buf->len); i++) {
+                printk("%02X ", buf->data[i]);
+            }
+            printk("\n");
+            
+            // Check if the pattern matches expectation
+            if (buf->len >= 3) {
+                bool pattern_ok = true;
+                for (int i = 0; i < MIN(3, buf->len); i++) {
+                    if (buf->data[i] != (info->response_slot + i)) {
+                        pattern_ok = false;
+                        break;
+                    }
+                }
+                printk("  Pattern check: %s\n", pattern_ok ? "PASS" : "FAIL");
+            }
+        }
     }
 }
 
