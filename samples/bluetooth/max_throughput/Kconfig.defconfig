@@ -9,7 +9,7 @@ config MAX_THROUGHPUT
 
 config BT_MAX_THROUGHPUT_DEVICES
 	int "Number of PAwR scanner devices"
-	default 20
+	default 16
 	range 1 255
 	depends on MAX_THROUGHPUT
 	help
@@ -18,7 +18,7 @@ config BT_MAX_THROUGHPUT_DEVICES
 
 config BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS
 	int "PAwR advertising interval (ms)"
-	default 100
+	default 150
 	range 20 1000
 	depends on MAX_THROUGHPUT
 	help

@@ -12,14 +12,38 @@
 #include <zephyr/sys/util.h>
 
 #define NAME_LEN 30
-/* Add debug control */
-// Configuration constants
+/* Add debug control - Set to 0 for minimal prints, 1 for verbose */
 #define DEBUG_VERBOSE 0
-#define MAX_PAWR_RESPONSE_SIZE 247  // Maximum PAwR response packet size
-                                    // Must match advertiser's expected response size
+#define DEBUG_RESPONSES 0  // Control response-related prints
+#define DEBUG_TIMING 0     // Control timing-related prints
 
-// BLE advertising data types
-#define BT_DATA_MANUFACTURER_DATA 0xFF  // Manufacturer-specific data type
+// Buffer size constraints from Nordic SDK
+#define MAX_PAWR_TOTAL_BUFFER_SIZE 1650  // CONFIG_BT_CTLR_ADV_DATA_LEN_MAX limit
+#define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
+
+// Dynamic device count - will be set by advertiser
+static uint8_t ACTUAL_DEVICE_COUNT = 0;
+
+// Calculate optimal response size based on actual device count from advertiser
+static uint16_t calculate_optimal_response_size(uint8_t device_count) {
+    if (device_count == 0) {
+        device_count = 16; // Fallback only if not set
+    }
+    
+    uint16_t optimal_size = (MAX_PAWR_TOTAL_BUFFER_SIZE - 20) / device_count;
+    
+    // Clamp to BLE spec limits
+    if (optimal_size > MAX_INDIVIDUAL_RESPONSE_SIZE) {
+        optimal_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
+    }
+    
+    return optimal_size;
+}
+
+// Dynamic response size based on optimal calculation
+static uint16_t DYNAMIC_RESPONSE_SIZE = 0;
+
+// BT_DATA_MANUFACTURER_DATA is already defined in Bluetooth headers - removed duplicate
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
@@ -30,7 +54,7 @@ static struct bt_le_per_adv_sync *default_sync;
 static struct __packed {
 	uint8_t subevent;
 	uint8_t response_slot;
-
+	uint8_t total_devices;  // Add total device count for dynamic sizing
 } pawr_timing;
 
 static void sync_cb(struct bt_le_per_adv_sync *sync, 
@@ -92,13 +116,26 @@ static bool print_ad_field(struct bt_data *data, void *user_data)
 
 static struct bt_le_per_adv_response_params rsp_params;
 
-NET_BUF_SIMPLE_DEFINE_STATIC(rsp_buf, 247);
+NET_BUF_SIMPLE_DEFINE_STATIC(rsp_buf, 260);
 
 static void recv_cb(struct bt_le_per_adv_sync *sync,
                    const struct bt_le_per_adv_sync_recv_info *info,
                    struct net_buf_simple *buf)
 {
     int err;
+
+    // Initialize dynamic response size if not set
+    if (DYNAMIC_RESPONSE_SIZE == 0) {
+        DYNAMIC_RESPONSE_SIZE = calculate_optimal_response_size(ACTUAL_DEVICE_COUNT);
+        if (ACTUAL_DEVICE_COUNT > 0) {
+            printk("📱 Responder using dynamic response size: %d bytes\n", DYNAMIC_RESPONSE_SIZE);
+            printk("   Configured for %d devices = %d bytes total\n", 
+                   ACTUAL_DEVICE_COUNT, ACTUAL_DEVICE_COUNT * DYNAMIC_RESPONSE_SIZE);
+        } else {
+            printk("📱 Responder using fallback response size: %d bytes\n", DYNAMIC_RESPONSE_SIZE);
+            printk("   Will be reconfigured when advertiser provides device count\n");
+        }
+    }
 
     if (buf && buf->len) {
         /* Parse manufacturer data to extract retransmission bitmap */
@@ -128,11 +165,11 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
             }
         }
         
-        /* Generate raw test data to bypass Nordic SDK buffer limitations */
+        /* Generate raw test data using dynamic response size */
         net_buf_simple_reset(&rsp_buf);
         
-        // Fill the entire buffer with raw bytes - no headers, no structure
-        for (int i = 0; i < MAX_PAWR_RESPONSE_SIZE; i++) {
+        // Fill the buffer with raw bytes - no headers, no structure
+        for (int i = 0; i < DYNAMIC_RESPONSE_SIZE; i++) {
             net_buf_simple_add_u8(&rsp_buf, pawr_timing.response_slot + i);
         }
 
@@ -145,7 +182,8 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
                info->subevent, pawr_timing.response_slot, rsp_buf.len);
         if (DEBUG_VERBOSE) {
             bt_data_parse(buf, print_ad_field, NULL);
-        } else {
+        } else if (DEBUG_RESPONSES) {
+            /*
             // Show first few bytes of response data for verification
             printk("  Sending: pattern=slot+offset, slot=%d, subevent=%d, len=%d\n", 
                    pawr_timing.response_slot, info->subevent, rsp_buf.len);
@@ -154,6 +192,7 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
                 printk("%02X ", rsp_buf.data[i]);
             }
             printk("\n");
+            */
         }
 
         err = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
@@ -193,9 +232,15 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
 
 	memcpy(&pawr_timing, buf, len);
 
-	if (DEBUG_VERBOSE) {
-		printk("[TIMING] New config SE:%d Slot:%d\n", 
-			   pawr_timing.subevent, pawr_timing.response_slot);
+	// Update actual device count and recalculate response size
+	ACTUAL_DEVICE_COUNT = pawr_timing.total_devices;
+	DYNAMIC_RESPONSE_SIZE = calculate_optimal_response_size(ACTUAL_DEVICE_COUNT);
+
+	if (DEBUG_TIMING) {
+		printk("[TIMING] New config SE:%d Slot:%d Total:%d devices\n", 
+			   pawr_timing.subevent, pawr_timing.response_slot, pawr_timing.total_devices);
+		printk("[TIMING] Recalculated response size: %d bytes for %d devices\n",
+			   DYNAMIC_RESPONSE_SIZE, ACTUAL_DEVICE_COUNT);
 	}
 
 	struct bt_le_per_adv_sync_subevent_params params;
@@ -259,26 +304,14 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     }
 }
 
-static const char *phy_to_str(uint8_t phy)
-{
-    switch (phy) {
-    case BT_GAP_LE_PHY_1M:
-        return "LE 1M";
-    case BT_GAP_LE_PHY_2M:
-        return "LE 2M";
-    case BT_GAP_LE_PHY_CODED:
-        return "LE Coded";
-    default:
-        return "Unknown";
-    }
-}
+// Removed unused phy_to_str function
 
 static void le_param_updated(struct bt_conn *conn, uint16_t interval,
                            uint16_t latency, uint16_t timeout)
 {
     if (DEBUG_VERBOSE) {
         printk("[SYNC] Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
-               interval * 1.25, latency, timeout * 10);
+               (double)(interval * 1.25f), latency, timeout * 10);
     }
 }
 
