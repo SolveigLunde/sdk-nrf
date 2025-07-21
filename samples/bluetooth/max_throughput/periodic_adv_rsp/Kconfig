@@ -12,7 +12,7 @@ config MAX_THROUGHPUT
 config BT_MAX_THROUGHPUT_DEVICES
 	int "Number of PAwR scanner devices"
 	default 16
-	range 1 50
+	range 1 255
 	depends on MAX_THROUGHPUT
 	help
 		Number of scanner devices that will participate in the PAwR communication.
