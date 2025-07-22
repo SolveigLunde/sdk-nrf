@@ -2,7 +2,7 @@
 
 # === CONFIGURATION ===
 # Get number of devices from Kconfig
-CONFIG_FILE="periodic_adv_rsp/build_p/periodic_adv_rsp/zephyr/.config"
+CONFIG_FILE="periodic_adv_rsp/build/periodic_adv_rsp/zephyr/.config"
 if [ -f "$CONFIG_FILE" ]; then
     NUM_SYNCHRONIZERS=$(grep "CONFIG_BT_MAX_THROUGHPUT_DEVICES=" "$CONFIG_FILE" | cut -d'=' -f2)
 else
@@ -14,17 +14,20 @@ fi
 echo "Cleaning up /tmp/bs_azure/..."
 rm -rf /tmp/bs_azure/*
 
+# Clean up throughput log
+echo "Cleaning up throughput.log..."
+echo -n > throughput.log
 
 ##OBS: Remember to change the name of the build directory!!
 
 # === START ADVERTISER ===
 echo "Starting advertiser..."
-./periodic_adv_rsp/build_p/periodic_adv_rsp/zephyr/zephyr.exe -s=2 -d=0 &
+./periodic_adv_rsp/build/periodic_adv_rsp/zephyr/zephyr.exe -s=2 -d=0 &
 
 # === START SYNCHRONIZERS ===
 for ((i=1; i<=NUM_SYNCHRONIZERS; i++)); do
     echo "Starting synchronizer $i..."
-    ./periodic_sync_rsp/build_p/periodic_sync_rsp/zephyr/zephyr.exe -s=2 -d=$i &
+    ./periodic_sync_rsp/build/periodic_sync_rsp/zephyr/zephyr.exe -s=2 -d=$i &
 done
 
 # === START PHY SIMULATION ===
