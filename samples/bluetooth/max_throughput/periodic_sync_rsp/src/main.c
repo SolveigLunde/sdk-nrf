@@ -12,10 +12,6 @@
 #include <zephyr/sys/util.h>
 
 #define NAME_LEN 30
-/* Add debug control - Set to 0 for minimal prints, 1 for verbose */
-#define DEBUG_VERBOSE 0
-#define DEBUG_RESPONSES 0  // Control response-related prints
-#define DEBUG_TIMING 0     // Control timing-related prints
 
 // Buffer size constraints from Nordic SDK
 #define MAX_PAWR_TOTAL_BUFFER_SIZE 1650  // CONFIG_BT_CTLR_ADV_DATA_LEN_MAX limit
@@ -43,7 +39,6 @@ static uint16_t calculate_optimal_response_size(uint8_t device_count) {
 // Dynamic response size based on optimal calculation
 static uint16_t DYNAMIC_RESPONSE_SIZE = 0;
 
-// BT_DATA_MANUFACTURER_DATA is already defined in Bluetooth headers - removed duplicate
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
@@ -54,7 +49,7 @@ static struct bt_le_per_adv_sync *default_sync;
 static struct __packed {
 	uint8_t subevent;
 	uint8_t response_slot;
-	uint8_t total_devices;  // Add total device count for dynamic sizing
+	uint8_t total_devices;  
 } pawr_timing;
 
 static void sync_cb(struct bt_le_per_adv_sync *sync, 
@@ -92,26 +87,12 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
 
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
 
-    if (DEBUG_VERBOSE) {
-        printk("[SYNC] Sync terminated from %s (reason %d)\n", le_addr, info->reason);
-    }
 
     default_sync = NULL;
 
     k_sem_give(&sem_per_sync_lost);
 }
 
-static bool print_ad_field(struct bt_data *data, void *user_data)
-{
-    if (DEBUG_VERBOSE) {
-        printk("[SYNC] AD type 0x%02X: ", data->type);
-        for (size_t i = 0; i < data->data_len; i++) {
-            printk("%02X", data->data[i]);
-        }
-        printk("\n");
-    }
-    return true;
-}
 
 
 static struct bt_le_per_adv_response_params rsp_params;
@@ -180,28 +161,11 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
 
         printk("Indication: subevent %d, responding in slot %d with %d bytes\n", 
                info->subevent, pawr_timing.response_slot, rsp_buf.len);
-        if (DEBUG_VERBOSE) {
-            bt_data_parse(buf, print_ad_field, NULL);
-        } else if (DEBUG_RESPONSES) {
-            /*
-            // Show first few bytes of response data for verification
-            printk("  Sending: pattern=slot+offset, slot=%d, subevent=%d, len=%d\n", 
-                   pawr_timing.response_slot, info->subevent, rsp_buf.len);
-            printk("  First 8 bytes: ");
-            for (int i = 0; i < MIN(8, rsp_buf.len); i++) {
-                printk("%02X ", rsp_buf.data[i]);
-            }
-            printk("\n");
-            */
-        }
+        
 
         err = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
         if (err) {
             printk("Failed to send response (err %d)\n", err);
-        }
-    } else if (buf) {
-        if (DEBUG_VERBOSE) {
-            printk("Empty indication on subevent %d\n", info->subevent);
         }
     } else {
         printk("Failed to receive on subevent %d\n", info->subevent);
@@ -236,12 +200,6 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
 	ACTUAL_DEVICE_COUNT = pawr_timing.total_devices;
 	DYNAMIC_RESPONSE_SIZE = calculate_optimal_response_size(ACTUAL_DEVICE_COUNT);
 
-	if (DEBUG_TIMING) {
-		printk("[TIMING] New config SE:%d Slot:%d Total:%d devices\n", 
-			   pawr_timing.subevent, pawr_timing.response_slot, pawr_timing.total_devices);
-		printk("[TIMING] Recalculated response size: %d bytes for %d devices\n",
-			   DYNAMIC_RESPONSE_SIZE, ACTUAL_DEVICE_COUNT);
-	}
 
 	struct bt_le_per_adv_sync_subevent_params params;
 	uint8_t subevents[1];
@@ -257,8 +215,6 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
 		if (err) {
 			printk("[TIMING] Error: Failed to set subevents (err %d)\n", err);
 		}
-	} else if (DEBUG_VERBOSE) {
-		printk("[TIMING] Not synced yet\n");
 	}
 
 	return len;
@@ -299,26 +255,12 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     bt_conn_unref(default_conn);
     default_conn = NULL;
 
-    if (DEBUG_VERBOSE) {
-        printk("[SYNC]Disconnected (reason 0x%02X)\n", reason);
-    }
 }
 
-// Removed unused phy_to_str function
-
-static void le_param_updated(struct bt_conn *conn, uint16_t interval,
-                           uint16_t latency, uint16_t timeout)
-{
-    if (DEBUG_VERBOSE) {
-        printk("[SYNC] Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
-               (double)(interval * 1.25f), latency, timeout * 10);
-    }
-}
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
-    .le_param_updated = le_param_updated,
 };
 
 static const struct bt_data ad[] = {
@@ -363,18 +305,10 @@ int main(void)
 			continue;
 		}
 
-		if (DEBUG_VERBOSE) {
-			printk("[SYNC] Established\n");
-		}
-
 		err = k_sem_take(&sem_per_sync_lost, K_FOREVER);
 		if (err) {
 			printk("[SYNC] Error: Failed (err %d)\n", err);
 			return 0;
-		}
-
-		if (DEBUG_VERBOSE) {
-			printk("[SYNC] Lost\n");
 		}
 	} while (true);
 

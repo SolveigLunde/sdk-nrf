@@ -16,72 +16,59 @@
 #include <stdint.h>
 
 
-/* Add throughput measurement variables */
 static uint32_t total_bytes;
 static uint64_t stamp;
 #define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
-/* Add debug control - Set to 0 for minimal prints, 1 for verbose */
-#define DEBUG_VERBOSE 0
-#define DEBUG_RESPONSES 0  // Control response-related prints
-#define DEBUG_TIMING 0     // Control timing-related prints
 
 // Buffer size constraints from Nordic SDK
 #define MAX_PAWR_TOTAL_BUFFER_SIZE 1650  // CONFIG_BT_CTLR_ADV_DATA_LEN_MAX limit
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define MIN_INDIVIDUAL_RESPONSE_SIZE 50  // Minimum practical size for meaningful data
 
-/* Optimal configuration calculator */
+/* Configuration from Kconfig */
+#define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
+#define NUM_SUBEVENTS 1
+#define PACKET_SIZE   251
+#define NAME_LEN      30
+static uint16_t DYNAMIC_RESPONSE_SIZE = 247;
+
 typedef struct {
     uint8_t num_devices;
     uint16_t packet_size;
     uint16_t total_bytes_per_interval;
     uint32_t throughput_bps;
     uint16_t interval_ms;
-    bool uses_2m_phy;
     float efficiency_ratio;
-} optimal_config_t;
+} config_t;
 
-optimal_config_t calculate_optimal_config(uint16_t target_interval_ms) {
-    optimal_config_t best_config = {0};
-    uint32_t max_throughput = 0;
+config_t calculate_optimal_config(uint16_t target_interval_ms, uint8_t num_response_slots) {
+    config_t config = {0};
     
-    // Try different device counts and find optimal packet size for each
-    for (uint8_t devices = 8; devices <= 32; devices++) {
-        // Calculate maximum packet size that fits in buffer
-        uint16_t max_packet_size = (MAX_PAWR_TOTAL_BUFFER_SIZE - 20) / devices; // 20 bytes overhead
-        
-        // Clamp to BLE limits
-        if (max_packet_size > MAX_INDIVIDUAL_RESPONSE_SIZE) {
-            max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-        }
-        if (max_packet_size < MIN_INDIVIDUAL_RESPONSE_SIZE) {
-            continue; // Skip configurations that don't make sense
-        }
-        
-        uint16_t total_bytes = devices * max_packet_size;
-        
-        // Calculate throughput assuming 2M PHY
-        uint32_t throughput_bps = (total_bytes * 8 * 1000) / target_interval_ms;
-        
-        // Calculate efficiency (how much of the buffer we use)
-        float efficiency = (float)total_bytes / MAX_PAWR_TOTAL_BUFFER_SIZE;
-        
-        // Score configuration (prioritize throughput with good efficiency)
-        uint32_t score = (uint32_t)(throughput_bps * efficiency);
-        
-        if (score > max_throughput) {
-            max_throughput = score;
-            best_config.num_devices = devices;
-            best_config.packet_size = max_packet_size;
-            best_config.total_bytes_per_interval = total_bytes;
-            best_config.throughput_bps = throughput_bps;
-            best_config.interval_ms = target_interval_ms;
-            best_config.uses_2m_phy = true;
-            best_config.efficiency_ratio = efficiency;
-        }
-    }
-    
-    return best_config;
+	// Calculate maximum packet size that fits in buffer
+	uint16_t max_packet_size = (MAX_PAWR_TOTAL_BUFFER_SIZE - 20) / num_response_slots; // 20 bytes overhead
+	
+	// Clamp to BLE limits
+	if (max_packet_size > MAX_INDIVIDUAL_RESPONSE_SIZE) {
+		max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
+	}
+	
+	
+	uint16_t total_bytes = num_response_slots * max_packet_size;
+	
+	// Calculate throughput assuming 2M PHY
+	uint32_t throughput_bps = (total_bytes * 8 * 1000) / target_interval_ms;
+	
+	// Calculate efficiency (how much of the buffer we use)
+	float efficiency = (float)total_bytes / MAX_PAWR_TOTAL_BUFFER_SIZE;
+	
+	config.num_devices = num_response_slots;
+	config.packet_size = max_packet_size;
+	config.total_bytes_per_interval = total_bytes;
+	config.throughput_bps = throughput_bps;
+	config.interval_ms = target_interval_ms;
+	config.efficiency_ratio = efficiency;
+	
+    return config;
 }
 
 void print_optimal_configurations(void) {
@@ -92,53 +79,26 @@ void print_optimal_configurations(void) {
     
     uint16_t intervals[] = {100, 150, 200, 250, 300};
     for (int i = 0; i < ARRAY_SIZE(intervals); i++) {
-        optimal_config_t config = calculate_optimal_config(intervals[i]);
-        
+        config_t config = calculate_optimal_config(intervals[i], NUM_RSP_SLOTS);
+        uint32_t throughput_kbytes_per_sec = config.throughput_bps / 8192;
+
+		uint32_t efficiency_percent = (uint32_t)(config.efficiency_ratio * 100.0f + 0.5f);
+
         printk("\n--- %dms interval ---\n", intervals[i]);
-        printk("  Optimal: %d devices × %d bytes = %d bytes/interval\n",
+        printk("  Optimal: %d devices x %d bytes = %d bytes/interval\n",
                config.num_devices, config.packet_size, config.total_bytes_per_interval);
-        printk("  Throughput: %lu bps (%.1f KB/s)\n", 
-               config.throughput_bps, (double)(config.throughput_bps / 8192.0f));
-        printk("  Buffer efficiency: %.1f%%\n", (double)(config.efficiency_ratio * 100.0f));
+		printk("  Throughput: %lu bps (%lu KB/s)\n",
+				config.throughput_bps, throughput_kbytes_per_sec);
+        printk("  Buffer efficiency: %lu%%\n", efficiency_percent);
         
         if (intervals[i] == CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS) {
             printk("  *** CURRENT CONFIGURATION ***\n");
         }
     }
     
-    // Show recommended configuration
-    optimal_config_t recommended = calculate_optimal_config(200);
-    printk("\n=== RECOMMENDED CONFIGURATION ===\n");
-    printk("Devices: %d\n", recommended.num_devices);
-    printk("Packet size: %d bytes\n", recommended.packet_size);
-    printk("Total per interval: %d bytes (%.1f%% of buffer)\n", 
-           recommended.total_bytes_per_interval, (double)(recommended.efficiency_ratio * 100.0f));
-    printk("Expected throughput: %lu bps (%.1f KB/s)\n", 
-           recommended.throughput_bps, (double)(recommended.throughput_bps / 8192.0f));
-    printk("Interval: %dms\n", recommended.interval_ms);
-    
-    // Show comparison with current problematic config
-    printk("\n=== COMPARISON WITH CURRENT CONFIG ===\n");
-    printk("Current (problematic): 20 devices × 247 bytes = 4940 bytes\n");
-    printk("  Problem: Exceeds %d byte buffer limit by %d bytes!\n", 
-           MAX_PAWR_TOTAL_BUFFER_SIZE, (20 * 247) - MAX_PAWR_TOTAL_BUFFER_SIZE);
-    printk("Recommended: %d devices × %d bytes = %d bytes ✓\n",
-           recommended.num_devices, recommended.packet_size, recommended.total_bytes_per_interval);
 }
 
-/* Configuration from Kconfig */
-#define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
-#define NUM_SUBEVENTS 1
-#define PACKET_SIZE   251
-#define NAME_LEN      30
 
-// Dynamic response size based on optimal calculation
-static uint16_t DYNAMIC_RESPONSE_SIZE = 247;
-
-// BT_DATA_MANUFACTURER_DATA is already defined in Bluetooth headers - removed duplicate
-
-//#define MAX_BUFFER_SIZE 73  /* Maximum safe buffer size before HCI error */
- 
 static K_SEM_DEFINE(sem_connected, 0, 1);
 static K_SEM_DEFINE(sem_discovered, 0, 1);
 static K_SEM_DEFINE(sem_written, 0, 1);
@@ -156,47 +116,18 @@ static struct bt_uuid_128 pawr_char_uuid =
 static uint16_t pawr_attr_handle;
 
 
-
-/*
-static const struct bt_le_per_adv_param per_adv_params = {
-	.interval_min = 0x40,  //48 * 1.25ms = 60ms 
-	.interval_max = 0x40,  //Keep same as min for consistent timing 
-	.options = BT_LE_ADV_OPT_USE_TX_POWER,  //Include TX power in advertising PDU
-	.num_subevents = NUM_SUBEVENTS,
-	.subevent_interval = 0x30,  //32 * 1.25ms = 40ms - increased for more processing time 
-	.response_slot_delay = 0x18,  //16 * 1.25ms = 20ms - increased to ensure proper setup 
-	.response_slot_spacing = 0x04,  //8 * 0.125ms = 1ms - increased spacing between slots 
-	.num_response_slots = NUM_RSP_SLOTS,
-}; 
-*/
-void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
+void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
 	const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 8;     // 8 * 1.25ms = 10ms initial delay
 	const uint8_t MARGIN_MS = 10;                        // Extra margin for safety
 	const uint8_t PHY_RATE_MBPS = 2;                     // LE 2M PHY rate (updated from 1M)
 	
 	// Get optimal configuration for current interval
-	optimal_config_t optimal = calculate_optimal_config(CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS);
+	config_t optimal = calculate_optimal_config(CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS,num_response_slots);
 	
-	// Use optimal packet size instead of fixed 247
+	// Use optimal packet size
 	uint16_t TARGET_RESPONSE_SIZE_BYTES = optimal.packet_size;
 	DYNAMIC_RESPONSE_SIZE = optimal.packet_size;
-	
-	// Warn if using suboptimal configuration
-	if (num_response_slots != optimal.num_devices) {
-		printk("⚠️  WARNING: Using %d devices, but optimal is %d devices\n", 
-			   num_response_slots, optimal.num_devices);
-		printk("   Current total: %d bytes, Buffer limit: %d bytes\n",
-			   num_response_slots * TARGET_RESPONSE_SIZE_BYTES, MAX_PAWR_TOTAL_BUFFER_SIZE);
-		
-		// If current config exceeds buffer, reduce packet size
-		if (num_response_slots * TARGET_RESPONSE_SIZE_BYTES > MAX_PAWR_TOTAL_BUFFER_SIZE) {
-			TARGET_RESPONSE_SIZE_BYTES = (MAX_PAWR_TOTAL_BUFFER_SIZE - 20) / num_response_slots;
-			TARGET_RESPONSE_SIZE_BYTES = MIN(TARGET_RESPONSE_SIZE_BYTES, MAX_INDIVIDUAL_RESPONSE_SIZE);
-			DYNAMIC_RESPONSE_SIZE = TARGET_RESPONSE_SIZE_BYTES;
-			printk("   📉 Reducing packet size to %d bytes to fit buffer\n", TARGET_RESPONSE_SIZE_BYTES);
-		}
-	}
 	
 	// Calculate time needed to transmit optimal packet size
 	// Using 2M PHY: 2 Mbps = 2000 kbps
@@ -206,7 +137,7 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 	float required_slot_time_ms = transmission_time_ms * 1.5f;
 	
 	// Convert to spacing units (each unit = 0.125ms)
-	uint8_t slot_spacing = (uint8_t)((required_slot_time_ms + 0.124f) / 0.125f); // Round up
+	uint8_t slot_spacing = (uint8_t)((required_slot_time_ms + 0.124f) / 0.125f); 
 	
 	// Ensure minimum spacing per BLE spec
 	if (slot_spacing < 4) {
@@ -219,7 +150,7 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 	float total_response_time_ms = delay * 1.25f + num_response_slots * slot_spacing * 0.125f + MARGIN_MS;
 	
 	// Convert to subevent interval units (1.25ms each)
-	uint8_t subevent_interval = (uint8_t)((total_response_time_ms + 1.249f) / 1.25f); // Round up
+	uint8_t subevent_interval = (uint8_t)((total_response_time_ms + 1.249f) / 1.25f);
 	
 	// Clamp to BLE spec limits
 	subevent_interval = CLAMP(subevent_interval, 6, 255);
@@ -237,30 +168,37 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 	params->response_slot_delay = delay;
 	params->response_slot_spacing = slot_spacing;
 	params->num_response_slots = num_response_slots;
-	// Note: response_data_max_size is not a valid field in bt_le_per_adv_param - removed
 
-	// Enhanced debug output
 	float actual_interval_ms = subevent_interval * 1.25f;
 	float slot_time_ms = slot_spacing * 0.125f;
 	float total_throughput_bps = (num_response_slots * TARGET_RESPONSE_SIZE_BYTES * 8 * 1000.0f) / actual_interval_ms;
 	
-	printk("📡 PAwR configured for %d-byte responses (%dM PHY):\n", TARGET_RESPONSE_SIZE_BYTES, PHY_RATE_MBPS);
-	printk("   %u devices, slot_time=%.2f ms, delay=%.2f ms\n", 
-		   num_response_slots, (double)slot_time_ms, (double)(delay * 1.25f));
-	printk("   interval=%.2f ms, estimated throughput=%.0f bps (%.1f KB/s)\n",
-		   (double)actual_interval_ms, (double)total_throughput_bps, (double)(total_throughput_bps / 8192.0f));
+	uint32_t interval_int = (uint32_t)actual_interval_ms;
+	uint32_t interval_frac = (uint32_t)((actual_interval_ms - interval_int) * 100);
+
+	uint32_t slot_time_int = (uint32_t)slot_time_ms;
+	uint32_t slot_time_frac = (uint32_t)((slot_time_ms - slot_time_int) * 100);
+
+	printk(" PAwR configured for %d-byte responses (%dM PHY):\n", TARGET_RESPONSE_SIZE_BYTES, PHY_RATE_MBPS);
+	
+	printk("   %u devices, slot_time=%u.%02u ms, delay=%u ms\n", 
+			num_response_slots, slot_time_int, slot_time_frac, delay);
+	printk("   interval=%u.%02u ms, estimated throughput=%lu bps (%lu KB/s)\n",
+			interval_int, interval_frac,
+			(uint32_t)total_throughput_bps, (uint32_t)(total_throughput_bps / 8192));
 	
 	// Buffer utilization check
 	uint16_t total_expected_bytes = num_response_slots * TARGET_RESPONSE_SIZE_BYTES;
 	float buffer_utilization = (float)total_expected_bytes / MAX_PAWR_TOTAL_BUFFER_SIZE * 100.0f;
-	printk("   Buffer utilization: %d/%d bytes (%.1f%%)\n", 
-		   total_expected_bytes, MAX_PAWR_TOTAL_BUFFER_SIZE, (double)buffer_utilization);
+	uint32_t buffer_utilization_percent = (uint32_t)(buffer_utilization + 0.5f);  // round if needed
+	printk("   Buffer utilization: %d/%d bytes (%lu%%)\n", 
+       	total_expected_bytes, MAX_PAWR_TOTAL_BUFFER_SIZE, buffer_utilization_percent);
 	
 	if (total_expected_bytes > MAX_PAWR_TOTAL_BUFFER_SIZE) {
 		printk(" BUFFER OVERFLOW: Exceeds limit by %d bytes!\n", 
 			   total_expected_bytes - MAX_PAWR_TOTAL_BUFFER_SIZE);
 	} else {
-		printk("   ✅ Buffer usage within limits\n");
+		printk(" Buffer usage within limits\n");
 	}
 }
 
@@ -268,7 +206,7 @@ void calculate_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_respo
 static struct bt_le_per_adv_param per_adv_params;
 
 void init_adv_params(void) {
-calculate_pawr_params(&per_adv_params,NUM_RSP_SLOTS);
+	set_pawr_params(&per_adv_params,NUM_RSP_SLOTS);
 }
 
 static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
@@ -278,12 +216,10 @@ static uint8_t backing_store[NUM_SUBEVENTS][PACKET_SIZE];
 BUILD_ASSERT(ARRAY_SIZE(bufs) == ARRAY_SIZE(subevent_data_params));
 BUILD_ASSERT(ARRAY_SIZE(backing_store) == ARRAY_SIZE(subevent_data_params));
 
-// Add bitmap to track response slots - now dynamic sized
 #define BITMAP_BYTES_NEEDED(num_devices) (((num_devices) + 7) / 8)
 static uint8_t response_bitmap[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVICES)];
 static uint8_t expected_responses[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVICES)];
 
-// Helper functions for bitmap operations
 static void bitmap_set_bit(uint8_t *bitmap, int bit) {
     bitmap[bit / 8] |= (1 << (bit % 8));
 }
@@ -336,7 +272,7 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         }
     }
 
-    // Clear response bitmap for next cycle
+    
     bitmap_clear(response_bitmap, NUM_RSP_SLOTS);
 
     // Process each subevent
@@ -351,53 +287,24 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
         
-        // Add retransmission bitmap (dynamic size based on NUM_RSP_SLOTS)
         for (int j = 0; j < bitmap_bytes; j++) {
             net_buf_simple_add_u8(buf, retransmit_bitmap[j]);
         }
         
-        // Update length field (excluding the length byte itself)
         *length_field = buf->len - 1;
 
         subevent_data_params[i].subevent = request->start + i;
         subevent_data_params[i].response_slot_start = 0;
         subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
         subevent_data_params[i].data = buf;
-
-        if (DEBUG_VERBOSE) {
-            printk("SE%d: len=%d, retransmit_bitmap=", i, buf->len);
-            for (int k = 0; k < bitmap_bytes; k++) {
-                printk("%02X", retransmit_bitmap[k]);
-            }
-            printk("\n");
-        }
     }
 
     err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
     if (err) {
         printk("Failed to set subevent data (err %d)\n", err);
-    } else if (DEBUG_VERBOSE) {
-        printk("Data set OK, retransmit_bitmap=");
-        for (int k = 0; k < bitmap_bytes; k++) {
-            printk("%02X", retransmit_bitmap[k]);
-        }
-        printk("\n");
-    }
+    } 
 }
 
-static bool print_ad_field(struct bt_data *data, void *user_data)
-{
-	ARG_UNUSED(user_data);
-
-	printk("    0x%02X: ", data->type);
-	for (size_t i = 0; i < data->data_len; i++) {
-		printk("%02X", data->data[i]);
-	}
-
-	printk("\n");
-
-	return true;
-}
 
 static struct bt_conn *default_conn;
 
@@ -415,18 +322,15 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 
         total_bytes += buf->len;
         
-        // Mark this response slot as received
         if (info->response_slot < NUM_RSP_SLOTS) {
             bitmap_set_bit(response_bitmap, info->response_slot);
             
-            // Only expect responses after first successful response
             if (!bitmap_test_bit(expected_responses, info->response_slot)) {
                 bitmap_set_bit(expected_responses, info->response_slot);
                 printk("Slot %d now actively responding\n", info->response_slot);
             }
         }
         
-		//printk("Received response of length %d\n", buf->len);
 
         if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_DURATION) {
             delta = k_uptime_delta(&stamp);
@@ -446,31 +350,6 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 
         printk("Response: subevent %d, slot %d, size %d bytes\n", 
                info->subevent, info->response_slot, buf->len);
-        if (DEBUG_VERBOSE) {
-            bt_data_parse(buf, print_ad_field, NULL);
-        } else {
-			/*
-            // Analyze the simple test pattern: slot + offset
-            printk("  Expected pattern: slot %d + offset\n", info->response_slot);
-            printk("  Actual bytes: ");
-            for (int i = 0; i < MIN(10, buf->len); i++) {
-                printk("%02X ", buf->data[i]);
-            }
-            printk("\n");
-            
-            // Check if the pattern matches expectation
-            if (buf->len >= 3) {
-                bool pattern_ok = true;
-                for (int i = 0; i < MIN(3, buf->len); i++) {
-                    if (buf->data[i] != (info->response_slot + i)) {
-                        pattern_ok = false;
-                        break;
-                    }
-                }
-                printk("  Pattern check: %s\n", pattern_ok ? "PASS" : "FAIL");
-            }
-			*/
-        }
     }
 }
 
@@ -490,7 +369,6 @@ void connected_cb(struct bt_conn *conn, uint8_t err)
 		default_conn = NULL;
 		return;
 	}
-	/* Request 2M PHY */
 	struct bt_conn_le_phy_param phy_param = {
 		.options = BT_CONN_LE_PHY_OPT_NONE,
 		.pref_tx_phy = BT_GAP_LE_PHY_2M,
@@ -535,7 +413,6 @@ BT_CONN_CB_DEFINE(conn_cb) = {
 	.le_param_updated = le_param_updated,
 };
 
-// Removed unused phy_to_str function
  
  static bool data_cb(struct bt_data *data, void *user_data)
  {
@@ -649,7 +526,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
  struct pawr_timing {
 	 uint8_t subevent;
 	 uint8_t response_slot;
-	 uint8_t total_devices;  // Add total device count for dynamic sizing
+	 uint8_t total_devices;
  } __packed;
  
  static uint8_t num_synced;
@@ -761,7 +638,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
  
 		 sync_config.subevent = num_synced % NUM_SUBEVENTS;
 		 sync_config.response_slot = num_synced / NUM_SUBEVENTS;
-		 sync_config.total_devices = CONFIG_BT_MAX_THROUGHPUT_DEVICES; // Pass total devices
+		 sync_config.total_devices = CONFIG_BT_MAX_THROUGHPUT_DEVICES;
 		 num_synced++;
  
 		 write_params.func = write_func;

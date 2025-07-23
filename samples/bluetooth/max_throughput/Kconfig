@@ -3,4 +3,4 @@
 
 source "Kconfig.zephyr"
 
-rsource "Kconfig.defconfig" 
+rsource "periodic_adv_rsp/Kconfig" 
