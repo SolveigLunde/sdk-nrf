@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
-
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -15,22 +13,29 @@
 #include <stdio.h>
 #include <stdint.h>
 
+/*
+* PAwR Throughput Demo
+* Advertiser sends subevent data.
+* Devices respond in allocated slots.
+* Retransmissions are bitmap-controlled.
+* GATT is used for sync and slot configuration.
+*/
 
-static uint32_t total_bytes;
-static uint64_t stamp;
-#define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
+
+#define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
+#define NUM_SUBEVENTS 1
+#define PACKET_SIZE   251
+#define NAME_LEN      30
 
 // Buffer size constraints from Nordic SDK
 #define MAX_PAWR_TOTAL_BUFFER_SIZE 1650  // CONFIG_BT_CTLR_ADV_DATA_LEN_MAX limit
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define MIN_INDIVIDUAL_RESPONSE_SIZE 50  // Minimum practical size for meaningful data
+#define THROUGHPUT_PRINT_DURATION 1000 /* Print every second */
 
-/* Configuration from Kconfig */
-#define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
-#define NUM_SUBEVENTS 1
-#define PACKET_SIZE   251
-#define NAME_LEN      30
-static uint16_t DYNAMIC_RESPONSE_SIZE = 247;
+static uint16_t dynamic_rsp_size = 247;
+static uint32_t total_bytes;
+static uint64_t stamp;
 
 typedef struct {
     uint8_t num_devices;
@@ -51,7 +56,6 @@ config_t calculate_optimal_config(uint16_t target_interval_ms, uint8_t num_respo
 	if (max_packet_size > MAX_INDIVIDUAL_RESPONSE_SIZE) {
 		max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
 	}
-	
 	
 	uint16_t total_bytes = num_response_slots * max_packet_size;
 	
@@ -125,21 +129,16 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
 	// Get optimal configuration for current interval
 	config_t optimal = calculate_optimal_config(CONFIG_BT_MAX_THROUGHPUT_PAWR_INTERVAL_MS,num_response_slots);
 	
-	// Use optimal packet size
 	uint16_t TARGET_RESPONSE_SIZE_BYTES = optimal.packet_size;
-	DYNAMIC_RESPONSE_SIZE = optimal.packet_size;
+	dynamic_rsp_size = optimal.packet_size;
 	
 	// Calculate time needed to transmit optimal packet size
-	// Using 2M PHY: 2 Mbps = 2000 kbps
 	float transmission_time_ms = (float)(TARGET_RESPONSE_SIZE_BYTES * 8) / (PHY_RATE_MBPS * 1000);
 	
-	// Add margin for processing, radio switching, etc. (50% margin)
 	float required_slot_time_ms = transmission_time_ms * 1.5f;
 	
-	// Convert to spacing units (each unit = 0.125ms)
 	uint8_t slot_spacing = (uint8_t)((required_slot_time_ms + 0.124f) / 0.125f); 
 	
-	// Ensure minimum spacing per BLE spec
 	if (slot_spacing < 4) {
 		slot_spacing = 4;
 	}

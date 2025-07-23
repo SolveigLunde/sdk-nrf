@@ -18,16 +18,17 @@
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 
 // Dynamic device count - will be set by advertiser
-static uint8_t ACTUAL_DEVICE_COUNT = 0;
+static uint8_t actual_device_count = 0;
+// Dynamic response size based on optimal calculation
+static uint16_t dynamic_rsp_size = 0;
+
 
 // Calculate optimal response size based on actual device count from advertiser
 static uint16_t calculate_optimal_response_size(uint8_t device_count) {
     if (device_count == 0) {
         device_count = 16; // Fallback only if not set
     }
-    
     uint16_t optimal_size = (MAX_PAWR_TOTAL_BUFFER_SIZE - 20) / device_count;
-    
     // Clamp to BLE spec limits
     if (optimal_size > MAX_INDIVIDUAL_RESPONSE_SIZE) {
         optimal_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
@@ -36,16 +37,13 @@ static uint16_t calculate_optimal_response_size(uint8_t device_count) {
     return optimal_size;
 }
 
-// Dynamic response size based on optimal calculation
-static uint16_t DYNAMIC_RESPONSE_SIZE = 0;
-
-
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
 static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
 static struct bt_conn *default_conn;
 static struct bt_le_per_adv_sync *default_sync;
+
 static struct __packed {
 	uint8_t subevent;
 	uint8_t response_slot;
@@ -106,14 +104,14 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
     int err;
 
     // Initialize dynamic response size if not set
-    if (DYNAMIC_RESPONSE_SIZE == 0) {
-        DYNAMIC_RESPONSE_SIZE = calculate_optimal_response_size(ACTUAL_DEVICE_COUNT);
-        if (ACTUAL_DEVICE_COUNT > 0) {
-            printk("📱 Responder using dynamic response size: %d bytes\n", DYNAMIC_RESPONSE_SIZE);
+    if (dynamic_rsp_size == 0) {
+        dynamic_rsp_size = calculate_optimal_response_size(actual_device_count);
+        if (actual_device_count > 0) {
+            printk("📱 Responder using dynamic response size: %d bytes\n", dynamic_rsp_size);
             printk("   Configured for %d devices = %d bytes total\n", 
-                   ACTUAL_DEVICE_COUNT, ACTUAL_DEVICE_COUNT * DYNAMIC_RESPONSE_SIZE);
+                   actual_device_count, actual_device_count * dynamic_rsp_size);
         } else {
-            printk("📱 Responder using fallback response size: %d bytes\n", DYNAMIC_RESPONSE_SIZE);
+            printk("📱 Responder using fallback response size: %d bytes\n", dynamic_rsp_size);
             printk("   Will be reconfigured when advertiser provides device count\n");
         }
     }
@@ -150,7 +148,7 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
         net_buf_simple_reset(&rsp_buf);
         
         // Fill the buffer with raw bytes - no headers, no structure
-        for (int i = 0; i < DYNAMIC_RESPONSE_SIZE; i++) {
+        for (int i = 0; i < dynamic_rsp_size; i++) {
             net_buf_simple_add_u8(&rsp_buf, pawr_timing.response_slot + i);
         }
 
@@ -197,8 +195,8 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
 	memcpy(&pawr_timing, buf, len);
 
 	// Update actual device count and recalculate response size
-	ACTUAL_DEVICE_COUNT = pawr_timing.total_devices;
-	DYNAMIC_RESPONSE_SIZE = calculate_optimal_response_size(ACTUAL_DEVICE_COUNT);
+	actual_device_count = pawr_timing.total_devices;
+	dynamic_rsp_size = calculate_optimal_response_size(actual_device_count);
 
 
 	struct bt_le_per_adv_sync_subevent_params params;
