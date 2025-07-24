@@ -1,4 +1,4 @@
-# Maximum throughput sample with PAwR (Periodic Advertising with Responses)
+# High throughput PAwR sample
 
 ## Overview 
 This sample showcases high-throughput communication using Bluetooth LE Periodic Advertising with Responses (PAwR). 
