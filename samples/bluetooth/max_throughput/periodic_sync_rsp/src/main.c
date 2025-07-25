@@ -270,7 +270,7 @@ int main(void)
 	struct bt_le_per_adv_sync_transfer_param past_param;
 	int err;
 
-	printk("Starting PAwR Sync Demo\n");
+	printk("Starting PAwR Synchronizer\n");
 
 	err = bt_enable(NULL);
 	if (err) {

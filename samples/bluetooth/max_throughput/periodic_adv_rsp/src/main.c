@@ -540,7 +540,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
  
 	 init_bufs();
  
-	 printk("Starting Maximum Throughput PAwR Advertiser\n");
+	 printk("Starting PAwR Advertiser\n");
 	 printk("===========================================\n");
 
 	// Print optimal configuration analysis
