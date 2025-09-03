@@ -41,8 +41,6 @@ typedef struct {
     uint16_t interval_ms;
 } config_t;
 
-
-
 config_t calculate_optimal_config_interval(uint8_t num_response_slots) {
     config_t config = {0};
    
@@ -54,6 +52,7 @@ config_t calculate_optimal_config_interval(uint8_t num_response_slots) {
    
     return config;
 }
+
  
  
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
