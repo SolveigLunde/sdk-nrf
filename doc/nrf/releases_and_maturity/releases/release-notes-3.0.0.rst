@@ -38,7 +38,7 @@ Added the following features as supported:
 * Matter:
 
   * Matter 1.4.1: Matter commissioning using NFC tag can be officially certified now.
-  * :ref:`matter_manufacturer_specific_sample` sample: Dedicated sample, containing documentation and a preview :ref:`PC tool <ug_nrfconnect_manufacturer_cluster_editor_tool>`, facilitating creation and modification of manufacturer specific clusters.
+  * :ref:`matter_manufacturer_specific_sample` sample: Dedicated sample, containing documentation and a preview :ref:`PC app <ug_matter_gs_tools_matter_cluster_editor>`, facilitating creation and modification of manufacturer specific clusters.
 
 * PMIC:
 
@@ -138,9 +138,9 @@ Supported modem firmware
 
 See the following documentation for an overview of which modem firmware versions have been tested with this version of the |NCS|:
 
-* `Modem firmware compatibility matrix for the nRF9151 DK`_
-* `Modem firmware compatibility matrix for the nRF9161 DK`_
-* `Modem firmware compatibility matrix for the nRF9160 DK`_
+* `Modem firmware compatibility matrix for the nRF9151 SoC`_
+* `Modem firmware compatibility matrix for the nRF9161 SoC`_
+* `Modem firmware compatibility matrix for the nRF9160 SoC`_
 
 Use the latest version of the `Programmer app`_ of `nRF Connect for Desktop`_ to update the modem firmware.
 See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
@@ -375,10 +375,10 @@ Matter
   * Storing Matter key materials in the :ref:`matter_platforms_security_kmu`.
   * A new section :ref:`ug_matter_device_low_power_calibration_period` in the :ref:`ug_matter_device_low_power_configuration` page.
   * A new section :ref:`ug_matter_gs_tools_opp` in the :ref:`ug_matter_gs_tools` page.
-  * A new overview page for :ref:`ug_nrfconnect_manufacturer_cluster_editor_tool`.
-  * Released the first preview version of the Matter Manufacturer Cluster Editor Tool.
-    The tool allows you to create and edit Matter Manufacturer Cluster files or create an extension to the existing one.
-    The tool is available in release artifacts.
+  * A new overview page for :ref:`ug_matter_gs_tools_matter_cluster_editor`.
+  * Released the first preview version of the Matter Cluster Editor app.
+    The app allows you to create and edit Matter Cluster files or create an extension to the existing one.
+    The app is available in release artifacts.
 
 * Updated:
 
@@ -756,11 +756,11 @@ Bluetooth Fast Pair samples
       The change modifies the memory partition layout for the ``nrf54l15dk/nrf54l15/cpuapp`` board target and changes the MCUboot image signing algorithm.
       Because of that, the application images built for the ``nrf54l15dk/nrf54l15/cpuapp`` board target from this |NCS| release are not compatible with the MCUboot bootloader built from previous releases.
       It is highly recommended to use hardware cryptography for the nRF54L Series SoC for improved security.
-    * The configurations for board targets with the MCUboot bootloader support to use a non-default signature key file (the ``SB_CONFIG_BOOT_SIGNATURE_KEY_FILE`` Kconfig option).
+    * The configurations for board targets with the MCUboot bootloader support to use a non-default signature key file (the :kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` Kconfig option).
       The application uses a unique signature key file for each board target, which is defined at the same directory level as the target sysbuild configuration file.
       This modification changes the key set that is used by the MCUboot DFU solution.
       Because of that, the application images from this |NCS| release are not compatible with the MCUboot bootloader built from previous releases.
-    * The MCUboot DFU signature type to the Elliptic curve digital signatures with curve P-256 (ECDSA P256 - the ``SB_CONFIG_BOOT_SIGNATURE_TYPE_ECDSA_P256`` Kconfig option) for the ``nrf52840dk/nrf52840`` board target.
+    * The MCUboot DFU signature type to the Elliptic curve digital signatures with curve P-256 (ECDSA P256 - the :kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_TYPE_ECDSA_P256` Kconfig option) for the ``nrf52840dk/nrf52840`` board target.
       This is done to use Cryptocell 310 for image signature verification.
       This change breaks the backwards compatibility, as performing DFU from an old signature type to a new one is impossible.
 
@@ -903,7 +903,7 @@ PMIC samples
   * The :ref:`npm2100_one_button` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM2100 PMIC.
   * The :ref:`npm2100_fuel_gauge` sample that demonstrates how to calculate the battery state of charge of primary cell batteries using the :ref:`nrfxlib:nrf_fuel_gauge`.
 
-* :ref:`npm1300_fuel_gauge` sample:
+* :ref:`nPM1300: Fuel gauge <npm13xx_fuel_gauge>` sample:
 
   * Updated to accommodate API changes in nRF Fuel Gauge library v1.0.0.
 
@@ -937,7 +937,7 @@ Trusted Firmware-M (TF-M) samples
   * Added support for the following attestation token fields:
 
     * Profile definition
-    * PSA certificate reference (optional), configured using the ``SB_CONFIG_TFM_OTP_PSA_CERTIFICATE_REFERENCE`` sysbuild Kconfig option
+    * PSA certificate reference (optional), configured using the :kconfig:option:`SB_CONFIG_TFM_OTP_PSA_CERTIFICATE_REFERENCE` sysbuild Kconfig option
     * Verification service URL (optional), configured using the :kconfig:option:`CONFIG_TFM_ATTEST_VERIFICATION_SERVICE_URL` Kconfig option
 
 * :ref:`tfm_secure_peripheral_partition` sample:
@@ -1079,9 +1079,9 @@ Bluetooth libraries and services
 
     * The :c:func:`bt_fast_pair_info_cb_register` API to allow registration of multiple callbacks.
     * The Fast Pair sysbuild Kconfig options.
-      The ``SB_CONFIG_BT_FAST_PAIR`` Kconfig option is replaced with the ``SB_CONFIG_BT_FAST_PAIR_MODEL_ID`` and ``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY``.
+      The :kconfig:option:`SB_CONFIG_BT_FAST_PAIR` Kconfig option is replaced with the :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`.
     * The method of supplying the Fast Pair Model ID and Anti-Spoofing Private Key to generate the Fast Pair provisioning data HEX file.
-      The ``FP_MODEL_ID`` and ``FP_ANTI_SPOOFING_KEY`` CMake variables are replaced by the corresponding ``SB_CONFIG_BT_FAST_PAIR_MODEL_ID`` and ``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`` Kconfig options.
+      The ``FP_MODEL_ID`` and ``FP_ANTI_SPOOFING_KEY`` CMake variables are replaced by the corresponding :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY` Kconfig options.
     * The automatically generated ``bt_fast_pair`` partition definition (in the :file:`subsys/partition_manager/pm.yml.bt_fast_pair` file) to work correctly when building with TF-M.
     * The behavior of the :c:member:`bt_fast_pair_fmdn_info_cb.provisioning_state_changed` callback.
       The callback no longer reports the initial provisioning state after the Fast Pair subsystem is enabled with the :c:func:`bt_fast_pair_enable` function call.

@@ -75,6 +75,12 @@ static bool command_generates_command_complete_event(uint16_t hci_opcode)
 	case SDC_HCI_OPCODE_CMD_LE_CS_TEST_END:
 #endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING_TEST */
 #endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+#if defined(CONFIG_BT_CTLR_EXTENDED_FEAT_SET)
+	case SDC_HCI_OPCODE_CMD_LE_READ_ALL_REMOTE_FEATURES:
+#endif /* CONFIG_BT_CTLR_EXTENDED_FEAT_SET */
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	case SDC_HCI_OPCODE_CMD_LE_FRAME_SPACE_UPDATE:
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 		return false;
 	default:
 		return true;
@@ -643,6 +649,13 @@ void hci_internal_supported_commands(sdc_hci_ip_supported_commands_t *cmds)
 	cmds->hci_le_cs_set_procedure_parameters = 1;
 	cmds->hci_le_cs_procedure_enable = 1;
 #endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+#if defined(CONFIG_BT_CTLR_EXTENDED_FEAT_SET)
+	cmds->hci_le_read_all_local_supported_features = 1;
+	cmds->hci_le_read_all_remote_features = 1;
+#endif /* CONFIG_BT_CTLR_EXTENDED_FEAT_SET */
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	cmds->hci_le_frame_space_update = 1;
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 }
 
 #if defined(CONFIG_BT_HCI_VS)
@@ -673,114 +686,6 @@ static void supported_features(sdc_hci_ip_lmp_features_t *features)
 
 	features->bdedr_not_supported = 1;
 	features->le_supported = 1;
-}
-
-void hci_internal_le_supported_features(
-	sdc_hci_cmd_le_read_local_supported_features_return_t *features)
-{
-	memset(features, 0, sizeof(*features));
-
-	features->params.le_encryption = 1;
-	features->params.extended_reject_indication = 1;
-	features->params.slave_initiated_features_exchange = 1;
-	features->params.le_ping = 1;
-
-#ifdef CONFIG_BT_CTLR_DATA_LENGTH
-	features->params.le_data_packet_length_extension = 1;
-#endif
-
-#ifdef CONFIG_BT_CTLR_PRIVACY
-	features->params.ll_privacy = 1;
-#endif
-
-#ifdef CONFIG_BT_CTLR_EXT_SCAN_FP
-	features->params.extended_scanner_filter_policies = 1;
-#endif
-
-#ifdef CONFIG_BT_CTLR_PHY_2M
-	features->params.le_2m_phy = 1;
-#endif
-
-#ifdef CONFIG_BT_CTLR_PHY_CODED
-	features->params.le_coded_phy = 1;
-#endif
-
-#ifdef CONFIG_BT_CTLR_ADV_EXT
-	features->params.le_extended_advertising = 1;
-#ifdef CONFIG_BT_CTLR_PHY_CODED
-	features->params.advertising_coding_selection = 1;
-#endif
-#endif
-
-#if defined(CONFIG_BT_CTLR_ADV_PERIODIC) || defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-	features->params.le_periodic_advertising = 1;
-#ifdef CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER
-	features->params.periodic_advertising_sync_transfer_sender = 1;
-#endif
-#ifdef CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER
-	features->params.periodic_advertising_sync_transfer_recipient = 1;
-#endif
-#endif
-
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-	features->params.connectionless_cte_transmitter = 1;
-#endif
-
-	features->params.channel_selection_algorithm_2 = 1;
-
-#if defined(CONFIG_BT_CTLR_LE_POWER_CONTROL)
-	features->params.le_power_control_request = 1;
-	features->params.le_power_change_indication = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_LE_PATH_LOSS_MONITORING)
-	features->params.le_path_loss_monitoring = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT)
-	features->params.periodic_advertising_adi_support = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
-	features->params.connection_cte_response = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_SCA_UPDATE)
-	features->params.sleep_clock_accuracy_updates = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_PERIPHERAL_ISO)
-	features->params.connected_isochronous_stream_slave = 1;
-#endif
-#if defined(CONFIG_BT_CTLR_CENTRAL_ISO)
-	features->params.connected_isochronous_stream_master = 1;
-#endif
-#if defined(CONFIG_BT_CTLR_SYNC_ISO)
-	features->params.synchronized_receiver = 1;
-#endif
-#if defined(CONFIG_BT_CTLR_ADV_ISO)
-	features->params.isochronous_broadcaster = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_SDC_PAWR_ADV)
-	features->params.periodic_advertising_with_responses_advertiser = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_SDC_PAWR_SYNC)
-	features->params.periodic_advertising_with_responses_scanner = 1;
-#endif
-
-#if defined(CONFIG_BT_CTLR_SUBRATING)
-	features->params.connection_subrating = 1;
-#endif
-#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
-	features->params.channel_sounding = 1;
-	features->params.channel_sounding_tone_quality_indication = 1;
-#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
-
-#if defined(CONFIG_BT_CTLR_SDC_LE_POWER_CLASS_1)
-	features->params.le_Power_class_1 = 1;
-#endif /* CONFIG_BT_CTLR_SDC_LE_POWER_CLASS_1 */
 }
 
 static void le_read_supported_states(uint8_t *buf)
@@ -994,8 +899,7 @@ static uint8_t le_controller_cmd_put(uint8_t const * const cmd,
 
 	case SDC_HCI_OPCODE_CMD_LE_READ_LOCAL_SUPPORTED_FEATURES:
 		*param_length_out += sizeof(sdc_hci_cmd_le_read_local_supported_features_return_t);
-		hci_internal_le_supported_features((void *)event_out_params);
-		return 0;
+		return sdc_hci_cmd_le_read_local_supported_features((void *)event_out_params);
 
 	case SDC_HCI_OPCODE_CMD_LE_SET_RANDOM_ADDRESS:
 		return sdc_hci_cmd_le_set_random_address((void *)cmd_params);
@@ -1579,6 +1483,21 @@ static uint8_t le_controller_cmd_put(uint8_t const * const cmd,
 		return sdc_hci_cmd_le_cs_test_end();
 #endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING_TEST */
 #endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
+#if defined(CONFIG_BT_CTLR_EXTENDED_FEAT_SET)
+	case SDC_HCI_OPCODE_CMD_LE_READ_ALL_REMOTE_FEATURES:
+		return sdc_hci_cmd_le_read_all_remote_features((void *)cmd_params);
+	case SDC_HCI_OPCODE_CMD_LE_READ_ALL_LOCAL_SUPPORTED_FEATURES:
+		*param_length_out +=
+			sizeof(sdc_hci_cmd_le_read_all_local_supported_features_return_t);
+		return sdc_hci_cmd_le_read_all_local_supported_features(
+			(void *)event_out_params);
+#endif /* CONFIG_BT_CTLR_EXTENDED_FEAT_SET */
+
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	case SDC_HCI_OPCODE_CMD_LE_FRAME_SPACE_UPDATE:
+		return sdc_hci_cmd_le_frame_space_update((void *)cmd_params);
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 	default:
 		return BT_HCI_ERR_UNKNOWN_CMD;

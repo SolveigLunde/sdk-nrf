@@ -27,6 +27,11 @@ The sample supports the following development kits:
 
 .. include:: /includes/tfm.txt
 
+.. note::
+   This sample does not build or run for the ``nrf54h20dk/nrf54h20/cpuapp`` board target due to the IronSide SE migration.
+   See the ``NCSDK-34821`` in the :ref:`known_issues` page for more information.
+   The codebase and documentation will be updated in the future releases to address this issue.
+
 Overview
 ********
 
@@ -238,7 +243,7 @@ Building and running
 
 .. include:: /includes/ipc_radio_conf.txt
 
-When building the sample, you can provide the Fast Pair Model ID (``SB_CONFIG_BT_FAST_PAIR_MODEL_ID``) and the Fast Pair Anti-Spoofing Key (``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY``) as sysbuild Kconfig options.
+When building the sample, you can provide the Fast Pair Model ID (:kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID`) and the Fast Pair Anti-Spoofing Key (:kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`) as sysbuild Kconfig options.
 If the data is not provided, the sample uses the default provisioning data obtained for the *NCS input device* (the input device debug Fast Pair provider).
 See :ref:`ug_bt_fast_pair_provisioning` for detailed guide.
 
@@ -458,12 +463,13 @@ Personalized Name extension
 Testing Personalized Name extension is described in `Fast Pair Certification Guidelines for Personalized Name`_.
 
 .. note::
-   To mitigate Android Personalized Name write issues, whenever you change the Personalized Name on an Android phone, perform the following:
+   For Android devices running Android 15 or lower, to mitigate Android Personalized Name write issues when you change the Personalized Name, perform the following:
 
-   * Write the new Personalized Name.
-   * Disconnect the phone from the Fast Pair Provider.
-   * Put the Fast Pair Provider in not discoverable advertising mode.
-   * The phone reconnects and sends new Personalized Name to the Fast Pair Provider.
+   1. Write the new Personalized Name.
+   #. Disconnect the phone from the Fast Pair Provider.
+   #. Put the Fast Pair Provider in not discoverable advertising mode.
+   #. The phone reconnects automatically or you need to reconnect it manually.
+   #. The phone sends new Personalized Name to the Fast Pair Provider.
 
 Battery Notification extension
 ------------------------------
@@ -515,7 +521,7 @@ Fast Pair GATT Service
 This sample uses the :ref:`bt_fast_pair_readme` and its dependencies and is configured to meet the requirements of the Fast Pair standard.
 See :ref:`ug_bt_fast_pair` for details about integrating Fast Pair in the |NCS|.
 
-By default, this sample sets the ``SB_CONFIG_BT_FAST_PAIR_MODEL_ID`` and ``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`` Kconfig options to use the Nordic device model that is intended for demonstration purposes.
+By default, this sample sets the :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY` Kconfig options to use the Nordic device model that is intended for demonstration purposes.
 With these options set, the build system calls the :ref:`bt_fast_pair_provision_script` that automatically generates a hexadecimal file containing Fast Pair Model ID and the Anti-Spoofing Private Key.
 For more details about enabling Fast Pair for your application, see the :ref:`ug_bt_fast_pair_prerequisite_ops_kconfig` section in the Fast Pair integration guide.
 

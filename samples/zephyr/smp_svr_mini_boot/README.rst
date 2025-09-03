@@ -7,16 +7,18 @@ MCUboot minimal configuration
    :local:
    :depth: 2
 
-The MCUboot minimal configuration sample provides the minimal and recommended settings for MCUboot on the nRF54L15 DK using the Zephyr's :zephyr:code-sample:`smp-svr` sample, where MCUboot is configured as a sub-image.
+The MCUboot minimal configuration sample provides the minimal and recommended settings for MCUboot on :ref:`nRF54L15 DK <ug_nrf54l>` and :ref:`nRF54H20 DK <ug_nrf54h>` using the Zephyr's :zephyr:code-sample:`smp-svr` sample, where MCUboot is configured as a sub-image.
 
 Overview
 ********
 
 This sample shows how to configure MCUboot for secure boot and Device Firmware Update (DFU) capabilities using the Zephyr RTOS.
-The MCUboot is configured to utilize hardware cryptography with the :ref:`ED25519 signature <ug_nrf54l_cryptography>` and the :ref:`Key Management Unit (KMU) <ug_nrf54l_developing_basics_kmu>` for secure key storage.
-The setup uses LTO, direct-xip mode and disables non-essential functionalities to downsize the MCUboot non-volatile memory footprint.
+The MCUboot is configured to utilize hardware cryptography with the :ref:`ED25519 signature <ug_nrf54l_cryptography>`. Additionally, for nRF54L15 DK  :ref:`Key Management Unit (KMU) <ug_nrf54l_developing_basics_kmu>` for secure key storage is used.
+The setup uses LTO and disables non-essential functionalities to downsize the MCUboot non-volatile memory footprint.
 
 The SMP server sample is configured to support Bluetooth® LE and shell for the MCUmgr protocol, which facilitates image management and OS commands.
+
+To achieve minimal size, direct-xip mode can be used, though you can build the sample with the swap using move mode as well.
 
 Requirements
 ************
@@ -32,7 +34,11 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
-Make sure you are building your project with the ``SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE`` Kconfig option enabled.
+For nRF54L15 DK, make sure you are building your project with the :kconfig:option:`SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE` Kconfig option enabled.
+
+For direct-xip mode, you must build the sample with the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP` Kconfig option enabled.
+For swap using move mode, use the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_SWAP_USING_MOVE` Kconfig option instead.
+
 You will notice that the size of MCUboot is significantly reduced in comparison to the default configuration.
 
 If you are using command line, you must run the ``west flash --erase`` command to enable KMU provisioning.

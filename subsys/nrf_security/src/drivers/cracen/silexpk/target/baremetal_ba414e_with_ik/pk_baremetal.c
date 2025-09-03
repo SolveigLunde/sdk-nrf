@@ -23,7 +23,7 @@
 #include <security/cracen.h>
 #include <nrf_security_mutexes.h>
 
-#if CONFIG_CRACEN_HW_VERSION_LITE && !CONFIG_SOC_NRF54LM20A && !CONFIG_SOC_NRF54LV10A
+#if defined(CONFIG_CRACEN_HW_VERSION_LITE) && !defined(CONFIG_CRACEN_NEED_IKG_INTERRUPT_WORKAROUND)
 #error Check to see if the current board needs the IKG-PKE interrupt workaround or not, \
 then update this error
 #endif
@@ -106,7 +106,7 @@ int read_status(sx_pk_req *req)
 int sx_pk_wait(sx_pk_req *req)
 {
 	do {
-		if (!IS_ENABLED(CONFIG_CRACEN_HW_VERSION_LITE) &&
+		if (!IS_ENABLED(CONFIG_CRACEN_NEED_IKG_INTERRUPT_WORKAROUND) &&
 		    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
 			/* In CRACEN Lite the PKE-IKG interrupt is only active when in PK mode.
 			 * This is to work around a hardware issue where the interrupt is never
@@ -125,6 +125,8 @@ int sx_pk_wait(sx_pk_req *req)
 			if (sx_pk_rdreg(&req->regs, IK_REG_STATUS) == IK_ENTROPY_ERROR) {
 				return SX_ERR_RETRY;
 			}
+		} else {
+			/* For compliance */
 		}
 
 	} while (is_busy(req));
@@ -132,40 +134,40 @@ int sx_pk_wait(sx_pk_req *req)
 	return read_status(req);
 }
 
-void sx_pk_wrreg(struct sx_regs *regs, uint32_t addr, uint32_t v)
+void sx_pk_wrreg(struct sx_regs *regs, uint32_t addr, uint32_t value)
 {
-	volatile uint32_t *p = (uint32_t *)(regs->base + addr);
+	volatile uint32_t *reg_ptr = (uint32_t *)(regs->base + addr);
 
 #ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
-	printk("sx_pk_wrreg(addr=0x%x, p=%p, val=0x%x)\r\n", addr, p, v);
+	printk("sx_pk_wrreg(addr=0x%x, reg_ptr=%p, val=0x%x)\r\n", addr, reg_ptr, value);
 #endif
-	if ((uintptr_t)p % 4) {
-		SX_WARN_UNALIGNED_ADDR(p);
+	if ((uintptr_t)reg_ptr % 4) {
+		SX_WARN_UNALIGNED_ADDR(reg_ptr);
 	}
 
-	*p = v;
+	*reg_ptr = value;
 }
 
 uint32_t sx_pk_rdreg(struct sx_regs *regs, uint32_t addr)
 {
-	volatile uint32_t *p = (uint32_t *)(regs->base + addr);
-	uint32_t v;
+	volatile uint32_t *reg_ptr = (uint32_t *)(regs->base + addr);
+	uint32_t value;
 
 
 #ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
-	printk("sx_pk_rdreg(addr=0x%x, p=%p)\r\n", addr, p);
+	printk("sx_pk_rdreg(addr=0x%x, reg_ptr=%p)\r\n", addr, reg_ptr);
 #endif
-	if ((uintptr_t)p % 4) {
-		SX_WARN_UNALIGNED_ADDR(p);
+	if ((uintptr_t)reg_ptr % 4) {
+		SX_WARN_UNALIGNED_ADDR(reg_ptr);
 	}
 
-	v = *p;
+	value = *reg_ptr;
 
 #ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
-	printk("result = 0x%x\r\n", v);
+	printk("result = 0x%x\r\n", value);
 #endif
 
-	return v;
+	return value;
 }
 
 struct sx_pk_blinder **sx_pk_get_blinder(struct sx_pk_cnx *cnx)
@@ -228,7 +230,7 @@ struct sx_pk_acq_req sx_pk_acquire_req(const struct sx_pk_cmd_def *cmd)
 	req.req->cnx = &silex_pk_engine;
 
 	cracen_acquire();
-	if (!IS_ENABLED(CONFIG_CRACEN_HW_VERSION_LITE) &&
+	if (!IS_ENABLED(CONFIG_CRACEN_NEED_IKG_INTERRUPT_WORKAROUND) &&
 	    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
 		/* In CRACEN Lite the PKE-IKG interrupt is only active when in PK mode.
 		 * This is to work around a hardware issue where the interrupt is never cleared.
@@ -239,7 +241,7 @@ struct sx_pk_acq_req sx_pk_acquire_req(const struct sx_pk_cmd_def *cmd)
 
 	/* Wait until initialized. */
 	while (ba414ep_is_busy(req.req) || ik_is_busy(req.req)) {
-		if (!IS_ENABLED(CONFIG_CRACEN_HW_VERSION_LITE) &&
+		if (!IS_ENABLED(CONFIG_CRACEN_NEED_IKG_INTERRUPT_WORKAROUND) &&
 		    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
 
 			cracen_wait_for_pke_interrupt();

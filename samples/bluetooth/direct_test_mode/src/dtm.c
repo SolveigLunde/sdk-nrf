@@ -184,10 +184,6 @@ BUILD_ASSERT(NRFX_TIMER_CONFIG_LABEL(ANOMALY_172_TIMER_INSTANCE) == 1,
 #define PACKET_BA_LEN             3
 /* CTE IQ sample data size. */
 #define DTM_CTE_SAMPLE_DATA_SIZE  0x52
-/* Vendor specific packet type for internal use. */
-#define DTM_PKT_TYPE_VENDORSPECIFIC  0xFE
-/* 1111111 bit pattern packet type for internal use. */
-#define DTM_PKT_TYPE_0xFF            0xFF
 
 /* Maximum number of payload octets that the local Controller supports for
  * transmission of a single Link Layer Data Physical Channel PDU.
@@ -773,6 +769,10 @@ static int clock_init(void)
 		nrf_power_task_trigger(NRF_POWER, NRF_POWER_TASK_CONSTLAT);
 	}
 #endif /* NRF54L_ERRATA_20_PRESENT */
+
+#if defined(NRF54LM20A_ENGA_XXAA)
+	nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_PLLSTART);
+#endif /* defined(NRF54LM20A_ENGA_XXAA) */
 
 	return err;
 }
@@ -1890,8 +1890,10 @@ static int dtm_vendor_specific_pkt(uint32_t vendor_cmd, uint32_t vendor_option)
 		}
 
 		/* Not a packet type, but used to indicate that a continuous
-		 * carrier signal should be transmitted by the radio.
+		 * carrier signal should be transmitted by the radio on the
+		 * channel indicated by the 'option' field.
 		 */
+		dtm_inst.phys_ch = vendor_option;
 		radio_prepare(TX_MODE);
 		nrf_radio_fast_ramp_up_enable_set(NRF_RADIO, IS_ENABLED(CONFIG_DTM_FAST_RAMP_UP));
 
@@ -2043,8 +2045,11 @@ static uint32_t dtm_packet_interval_calculate(uint32_t test_payload_length,
 
 	if (dtm_inst.cte_info.mode != DTM_CTE_MODE_OFF) {
 		/* Add 8 - bit S1 field with CTEInfo. */
-		((test_packet_length += mode) == RADIO_MODE_MODE_Ble_1Mbit) ?
-						 8 : 4;
+		if (mode == NRF_RADIO_MODE_BLE_1MBIT) {
+			test_packet_length += 8; /* 1 byte */
+		} else {
+			test_packet_length += 4; /* 0.5 byte */
+		}
 
 		/* Add CTE length in us to test packet length. */
 		test_packet_length +=
@@ -2402,8 +2407,14 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 
 	dtm_inst.packet_type = pkt;
 	dtm_inst.packet_len = length;
-	dtm_inst.phys_ch = channel;
 	dtm_inst.current_pdu = dtm_inst.pdu;
+
+	/* 'channel' may be used for different purposes if the packet
+	 * is vendor-specific
+	 */
+	if (pkt != DTM_PACKET_VENDOR) {
+		dtm_inst.phys_ch = channel;
+	}
 
 	/* Check for illegal values of m_phys_ch. Skip the check if the
 	 * packet is vendor specific.
@@ -2417,7 +2428,7 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 	/* Check for illegal values of packet_len. Skip the check
 	 * if the packet is vendor spesific.
 	 */
-	if (dtm_inst.packet_type != DTM_PKT_TYPE_VENDORSPECIFIC &&
+	if (dtm_inst.packet_type != DTM_PACKET_VENDOR &&
 	    dtm_inst.packet_len > DTM_PAYLOAD_MAX_SIZE) {
 		/* Parameter error */
 		return -EINVAL;

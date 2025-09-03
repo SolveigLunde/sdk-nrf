@@ -39,7 +39,7 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, and ``nrf54l15dk/nrf54l15/cpuapp``.
+* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, ``nrf54l15dk/nrf54l15/cpuapp`` and ``nrf54lm20dk/nrf54lm20a/cpuapp``.
 * Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002ek`` shield attached or for ``nrf7002dk/nrf5340/cpuapp``.
 
 Overview
@@ -258,6 +258,16 @@ Building and running
 .. include:: /includes/ipc_radio_conf.txt
 
 See `Configuration`_ for information about building the sample with the DFU support.
+
+Building the Matter over Wi-Fi sample variant on nRF5340 DK with nRF7002 EK shield
+==================================================================================
+
+.. include:: /includes/matter_building_nrf5340dk_70ek
+
+Flashing the Matter over Wi-Fi sample variant
+=============================================
+
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a custom configuration
 ================================

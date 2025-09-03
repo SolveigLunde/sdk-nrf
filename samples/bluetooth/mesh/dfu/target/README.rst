@@ -141,7 +141,8 @@ The sample can also be the Target node updated by any firmware image that is com
 In both cases, the firmware needs to be signed and the firmware version increased to pass the validation when the MCUboot swaps the images.
 
 To set a new version, alter the Kconfig option :kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION` to a version that is higher than the default version of: ``"1.0.0+0"``.
-Then, after rebuilding the sample, the binary of the updated sample can be found in :file:`samples/bluetooth/mesh_dfu/target/build/zephyr/app_update.bin`.
+Then, after rebuilding the sample, the binary of the updated sample can be found in :file:`samples/bluetooth/mesh/dfu/target/build/target/zephyr/zephyr.signed.bin` or :file:`samples/bluetooth/mesh/dfu/target/build/dfu_application.zip`.
+The file format to use depends on the tool you are using for the DFU procedure.
 
 To perform a DFU with this sample, the following additional information is required:
 
@@ -200,6 +201,25 @@ In this sample, UART and SEGGER RTT are available as logging backends.
 
 .. note::
    With the :zephyr:board:`nrf52840dongle`, only logging over UART is available.
+
+External flash support
+======================
+
+This sample supports external flash memory as secondary storage partition for saving of the incoming firmware images.
+See :ref:`ug_bootloader_external_flash` for more information on external flash support as a partition in the :ref:`ug_bootloader_mcuboot_nsib`.
+The default configuration does not support external flash memory.
+To enable external flash support, set :makevar:`FILE_SUFFIX` to ``ext_flash`` when building the sample.
+
+Build the sample using the following command:
+
+.. code-block:: console
+
+   west build -p -b *board_name* -- -DFILE_SUFFIX=ext_flash
+
+.. note::
+   The external flash is not erased during the internal flash erasing procedure.
+   See `nRF Util`_ for more information on how to erase the external flash.
+   Currently, only the external flash on the ``nrf52840dk/nrf52840`` board is supported at the moment.
 
 Dependencies
 ************

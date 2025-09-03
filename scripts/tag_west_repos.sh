@@ -35,6 +35,7 @@
 # Configure the tags by editing this section.
 
 declare -A PROJECT_TAGS
+declare -A UPSTREAM_REMOTES
 
 # Set the tag names for all the projects below.
 #
@@ -46,22 +47,20 @@ PROJECT_TAGS[nrfxlib]=""
 PROJECT_TAGS[find-my]=""
 PROJECT_TAGS[matter]=""
 PROJECT_TAGS[nrf-802154]=""
-PROJECT_TAGS[suit-processor]=""
-PROJECT_TAGS[suit-generator]=""
 
 # OSS repositories: vX.Y.Z-ncsN(-I)(-rcM)
 PROJECT_TAGS[zephyr]=""
 PROJECT_TAGS[mcuboot]=""
 PROJECT_TAGS[trusted-firmware-m]=""
 PROJECT_TAGS[mbedtls]=""
+PROJECT_TAGS[oberon-psa-crypto]=""
 
-
-
-
-
-
-
-
+# Upstream OSS remotes
+UPSTREAM_REMOTES[zephyr]="https://github.com/zephyrproject-rtos/zephyr"
+UPSTREAM_REMOTES[mcuboot]="https://github.com/mcu-tools/mcuboot"
+UPSTREAM_REMOTES[trusted-firmware-m]="https://github.com/TrustedFirmware-M/trusted-firmware-m"
+UPSTREAM_REMOTES[mbedtls]="https://github.com/Mbed-TLS/mbedtls"
+UPSTREAM_REMOTES[oberon-psa-crypto]="" # Upstream skipped because it's private
 
 
 # ----------------------------------------------------------------------
@@ -72,6 +71,16 @@ SCRIPT=$(basename "$0")
 hline() {
     # Helper function for printing a horizontal line
     printf '%*s\n' "$(tput cols)" '' | tr ' ' -
+}
+
+has_remote() {
+    project="$1"
+
+    if [ -z "${UPSTREAM_REMOTES[$project]}" ]; then
+        return 1
+    else
+        return 0
+    fi
 }
 
 tag() {
@@ -99,6 +108,11 @@ tag() {
     remote_basename=$(west list -f '{url}' "$project" | xargs basename)
     local_path=$(west list -f '{abspath}' "$project")
     message="$remote_basename $tagname"
+
+    if has_remote "$project"; then
+        describe=$(git -C "$local_path" describe --exclude 'ncs-*')
+        message="$message"$'\n'"$project $describe"
+    fi
 
     echo "$project": creating tag "$tagname" for "$sha" in "$local_path"
     git -C "$local_path" tag -s -a -m "$message" "$tagname" "$sha" || exit 1
@@ -158,8 +172,36 @@ remove_tag() {
     git -C "$local_path" tag -d "$tagname"
 }
 
+fetch_oss() {
+    # Fetches all OSS repositories remotes
+
+    hline
+    echo Fetching OSS repositories remotes
+
+    for project in "${!UPSTREAM_REMOTES[@]}"; do
+        if [ -z "${PROJECT_TAGS[$project]}" ]; then
+            echo "Skipping $project (not tagged)"
+            continue
+        fi
+
+        if ! has_remote "$project"; then
+            echo "Remote not set for $project"
+            continue
+        fi
+
+        local_path=$(west list -f '{abspath}' "$project")
+        echo "$project": Fetching remote  in "$local_path"
+        git -C "$local_path" fetch --tags "${UPSTREAM_REMOTES[$project]}" || exit 1
+    done
+}
+
 tag_all() {
     # Creates all the tags in the PROJECT_TAGS array.
+
+    fetch_oss
+
+    hline
+    echo Tagging all repositories
 
     for project in "${!PROJECT_TAGS[@]}"; do
         if [ -z "${PROJECT_TAGS[$project]}" ]; then

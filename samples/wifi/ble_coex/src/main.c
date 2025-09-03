@@ -151,7 +151,7 @@ static void handle_wifi_disconnect_result(struct net_mgmt_event_callback *cb)
 }
 
 static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				     uint32_t mgmt_event, struct net_if *iface)
+				     uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT:
@@ -179,7 +179,7 @@ static void print_dhcp_ip(struct net_mgmt_event_callback *cb)
 }
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+				    uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_IPV4_DHCP_BOUND:
@@ -284,6 +284,10 @@ static void udp_upload_results_cb(enum zperf_status status,
 		break;
 	case ZPERF_SESSION_FINISHED:
 		LOG_INF("Wi-Fi benchmark: Upload completed!");
+		if (!result) {
+			LOG_ERR("Result is NULL, Zperf session error");
+			break;
+		}
 		if (result->client_time_in_us != 0U) {
 			client_rate_in_kbps = (uint32_t)
 				(((uint64_t)result->nb_packets_sent *
@@ -424,7 +428,7 @@ int main(void)
 	}
 
 	if (test_wlan) {
-		struct zperf_upload_params params;
+		struct zperf_upload_params params = { 0 };
 
 		/* Start Wi-Fi traffic */
 		LOG_INF("Starting Wi-Fi benchmark: Zperf client");

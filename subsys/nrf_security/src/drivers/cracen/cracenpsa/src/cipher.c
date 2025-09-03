@@ -258,20 +258,20 @@ static psa_status_t decrypt_cbc(const struct sxkeyref *key, const uint8_t *input
 		return silex_statuscodes_to_psa(sx_status);
 	}
 
-	uint8_t padding = output[input_length - 1];
+	size_t padding_length = output[input_length - 1];
+	size_t padding_index = input_length - padding_length;
+	uint32_t failure = 0;
 
-	if (padding > SX_BLKCIPHER_AES_BLK_SZ || padding == 0) {
-		return PSA_ERROR_INVALID_PADDING;
+	failure |= (padding_length > SX_BLKCIPHER_AES_BLK_SZ);
+	failure |= (padding_length == 0);
+
+	for (size_t i = 0; i < input_length; i++) {
+		failure |= (output[i] ^ padding_length) * (i >= padding_index);
 	}
 
-	for (size_t i = input_length - padding; i < input_length; i++) {
-		if (output[i] != padding) {
-			return PSA_ERROR_INVALID_PADDING;
-		}
-	}
+	*output_length = padding_index;
 
-	*output_length = input_length - padding;
-	return PSA_SUCCESS;
+	return (failure == 0) ? PSA_SUCCESS : PSA_ERROR_INVALID_PADDING;
 }
 
 psa_status_t cracen_cipher_encrypt(const psa_key_attributes_t *attributes,
@@ -521,8 +521,8 @@ psa_status_t cracen_cipher_update(cracen_cipher_operation_t *operation, const ui
 	__ASSERT_NO_MSG(output_length != NULL);
 
 	int sx_status = SX_ERR_UNINITIALIZED_OBJ;
+	psa_status_t psa_status = PSA_ERROR_CORRUPTION_DETECTED;
 	*output_length = 0;
-	psa_status_t status = PSA_ERROR_CORRUPTION_DETECTED;
 
 	if (input_length == 0) {
 		return PSA_SUCCESS;
@@ -577,23 +577,23 @@ psa_status_t cracen_cipher_update(cracen_cipher_operation_t *operation, const ui
 				if (operation->unprocessed_input_bytes) {
 					__ASSERT_NO_MSG(operation->unprocessed_input_bytes ==
 							operation->blk_size);
-					status = crypt_ecb(
+					psa_status = crypt_ecb(
 						&operation->keyref, operation->unprocessed_input,
 						operation->unprocessed_input_bytes, output,
 						output_size, output_length, operation->dir);
-					if (status != PSA_SUCCESS) {
-						return status;
+					if (psa_status != PSA_SUCCESS) {
+						return psa_status;
 					}
 					output += (uint32_t)operation->unprocessed_input_bytes;
 					operation->unprocessed_input_bytes = 0;
 				}
 
 				if (block_bytes) {
-					status = crypt_ecb(
+					psa_status = crypt_ecb(
 						&operation->keyref, input, block_bytes, output,
 						output_size, output_length, operation->dir);
-					if (status != PSA_SUCCESS) {
-						return status;
+					if (psa_status != PSA_SUCCESS) {
+						return psa_status;
 					}
 				}
 			}
@@ -605,10 +605,10 @@ psa_status_t cracen_cipher_update(cracen_cipher_operation_t *operation, const ui
 					return silex_statuscodes_to_psa(sx_status);
 				}
 			} else {
-				psa_status_t r = initialize_cipher(operation);
+				psa_status = initialize_cipher(operation);
 
-				if (r != PSA_SUCCESS) {
-					return r;
+				if (psa_status != PSA_SUCCESS) {
+					return psa_status;
 				}
 			}
 
@@ -659,7 +659,7 @@ psa_status_t cracen_cipher_update(cracen_cipher_operation_t *operation, const ui
 		operation->unprocessed_input_bytes = input_length - block_bytes;
 	}
 
-	(void)status;
+	(void)psa_status;
 	return PSA_SUCCESS;
 }
 
@@ -698,10 +698,10 @@ psa_status_t cracen_cipher_finish(cracen_cipher_operation_t *operation, uint8_t 
 			return silex_statuscodes_to_psa(sx_status);
 		}
 	} else {
-		psa_status_t r = initialize_cipher(operation);
+		psa_status_t result = initialize_cipher(operation);
 
-		if (r != PSA_SUCCESS) {
-			return r;
+		if (result != PSA_SUCCESS) {
+			return result;
 		}
 	}
 
@@ -807,7 +807,13 @@ psa_status_t cracen_cipher_finish(cracen_cipher_operation_t *operation, uint8_t 
 
 psa_status_t cracen_cipher_abort(cracen_cipher_operation_t *operation)
 {
-	sx_blkcipher_free(&operation->cipher);
+	int sx_status;
+
+	sx_status = sx_blkcipher_free(&operation->cipher);
+	if (sx_status != SX_OK) {
+		return silex_statuscodes_to_psa(sx_status);
+	}
+
 	safe_memzero(operation, sizeof(cracen_cipher_operation_t));
 	return PSA_SUCCESS;
 }

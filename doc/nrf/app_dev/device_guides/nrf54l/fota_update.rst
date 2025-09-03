@@ -59,7 +59,7 @@ To enable support for FOTA updates, do the following:
 
 .. fota_upgrades_over_ble_mandatory_mcuboot_start
 
-* Enable the ``SB_CONFIG_BOOTLOADER_MCUBOOT`` option to use MCUboot as a bootloader.
+* Enable the :kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT` option to use MCUboot as a bootloader.
   You can do this by, for example, setting the option in the :file:`sysbuild.conf` file.
   For more information, go to the :ref:`ug_bootloader_adding_sysbuild_immutable_mcuboot` page.
 
@@ -100,7 +100,7 @@ To perform a FOTA update, complete the following steps:
       For each image included in the DFU-generated package, use a higher version number than your currently active firmware.
       You can do this by modifying the VERSION file in the application directory or by making changes to the application code.
       For the semantic versioning, modify the :kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION` Kconfig option.
-      For the monotonic counter (HW), modify the ``SB_CONFIG_MCUBOOT_HW_DOWNGRADE_PREVENTION_COUNTER_VALUE`` Kconfig option.
+      For the monotonic counter (HW), modify the :kconfig:option:`SB_CONFIG_MCUBOOT_HW_DOWNGRADE_PREVENTION_COUNTER_VALUE` Kconfig option.
       Otherwise, the DFU target may reject the FOTA process due to a downgrade prevention mechanism.
 
 #. Download the :file:`dfu_application.zip` archive to your mobile phone.
@@ -154,6 +154,10 @@ In |NCS|, you can build and program the :zephyr:code-sample:`smp-svr` as any oth
 
     .. group-tab:: nRF54L SoCs with HW cryptography support
 
+        .. note::
+
+           The nRF54LM20A SoC currently does not support this configuration.
+
         .. parsed-literal::
            :class: highlight
 
@@ -194,6 +198,10 @@ Consider using these features in your project to speed up the FOTA update proces
 Provisioning of keys for Hardware KMU
 *************************************
 
+.. note::
+
+   The nRF54LM20A SoC currently does not support KMU.
+
 In case of FOTA implementations using the MCUboot bootloader, which includes hardware cryptography and KMU, you must complete key provisioning before booting any application.
 Otherwise, the bootloader :ref:`may not boot the firmware setup and might take unwanted actions<ug_nrf54l_developing_basics_kmu_provisioning_keys>`.
 Refer to :ref:`ug_nrf54l_developing_provision_kmu` for detailed description.
@@ -217,7 +225,7 @@ For more information about the direct-xip mode and the revert mechanism support,
 
 To use MCUboot in the direct-xip mode together with FOTA updates, do the following:
 
-* Enable the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`` Kconfig option in sysbuild.
+* Enable the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP` Kconfig option in sysbuild.
 
 See how to build the :ref:`peripheral_lbs` sample with MCUboot in the direct-xip mode when the revert mechanism support is disabled:
 
@@ -228,7 +236,7 @@ See how to build the :ref:`peripheral_lbs` sample with MCUboot in the direct-xip
 
 Optionally, if you want to enable the revert mechanism support, complete the following:
 
-* Enable the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT`` Kconfig option in sysbuild instead of ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP``.
+* Enable the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT` Kconfig option in sysbuild instead of :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`.
 
 See how to build the :ref:`peripheral_lbs` sample with MCUboot in direct-xip mode when the revert mechanism support is enabled:
 
@@ -242,7 +250,7 @@ See how to build the :ref:`peripheral_lbs` sample with MCUboot in direct-xip mod
    Without this configuration, the application will fail to boot.
    Confirmation mark should not, however, be added when building update images.
 
-Both the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`` and ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT`` Kconfig options automatically build application update images for both slots.
+Both the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP` and :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT` Kconfig options automatically build application update images for both slots.
 To read about the files that are built when the option is enabled, refer to the :ref:`app_build_mcuboot_output` page.
 
 .. fota_upgrades_over_ble_mcuboot_direct_xip_nrfcdm_note_start

@@ -650,7 +650,7 @@ PMIC samples
   * The :ref:`npm2100_one_button` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM2100 PMIC.
   * The :ref:`npm2100_fuel_gauge` sample that demonstrates how to calculate the battery state of charge of primary cell batteries using the :ref:`nrfxlib:nrf_fuel_gauge`.
 
-* :ref:`npm1300_fuel_gauge` sample:
+* :ref:`nPM1300: Fuel gauge <npm13xx_fuel_gauge>` sample:
 
   * Updated to accommodate API changes in nRF Fuel Gauge library v1.0.0.
 
@@ -789,9 +789,9 @@ Bluetooth libraries and services
 
     * The :c:func:`bt_fast_pair_info_cb_register` API to allow registration of multiple callbacks.
     * The Fast Pair sysbuild Kconfig options.
-      The ``SB_CONFIG_BT_FAST_PAIR`` Kconfig option is replaced with the ``SB_CONFIG_BT_FAST_PAIR_MODEL_ID`` and ``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY``.
+      The :kconfig:option:`SB_CONFIG_BT_FAST_PAIR` Kconfig option is replaced with the :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`.
     * The method of supplying the Fast Pair Model ID and Anti-Spoofing Private Key to generate the Fast Pair provisioning data HEX file.
-      The ``FP_MODEL_ID`` and ``FP_ANTI_SPOOFING_KEY`` CMake variables are replaced by the corresponding ``SB_CONFIG_BT_FAST_PAIR_MODEL_ID`` and ``SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`` Kconfig options.
+      The ``FP_MODEL_ID`` and ``FP_ANTI_SPOOFING_KEY`` CMake variables are replaced by the corresponding :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY` Kconfig options.
     * The automatically generated ``bt_fast_pair`` partition definition (in the :file:`subsys/partition_manager/pm.yml.bt_fast_pair` file) to work correctly when building with TF-M.
     * The behavior of the :c:member:`bt_fast_pair_fmdn_info_cb.provisioning_state_changed` callback.
       The callback no longer reports the initial provisioning state after the Fast Pair subsystem is enabled with the :c:func:`bt_fast_pair_enable` function call.

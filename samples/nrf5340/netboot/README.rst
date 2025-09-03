@@ -76,9 +76,9 @@ This sample can be found under :file:`samples/nrf5340/netboot/` in the |NCS| fol
 
 To include the sample as an image in a sysbuild project that contains a network core application, add the following sysbuild Kconfig options in the project:
 
-* ``SB_CONFIG_BOOTLOADER_MCUBOOT``
-* ``SB_CONFIG_SECURE_BOOT_NETCORE``
-* ``SB_CONFIG_NETCORE_APP_UPDATE``
+* :kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT`
+* :kconfig:option:`SB_CONFIG_SECURE_BOOT_NETCORE`
+* :kconfig:option:`SB_CONFIG_NETCORE_APP_UPDATE`
 
 The build system includes the sample in the build automatically and generates a new set of firmware update files.
 These files match the ones described in :ref:`mcuboot:mcuboot_ncs`, except that they contain the network core application firmware and are prefixed with ``net_core_``.
@@ -127,7 +127,7 @@ After programming the sample to your development kit, complete the following ste
       For testing purposes, use nRF Util to program the update image directly into the update slot.
 
 #. Reset the kit.
-#. Observe that the output includes the following lines indicating that the MCUBoot in the application core has read the update image and performed a firmware update of the network core:
+#. Observe that the output includes the following lines indicating that the MCUboot in the application core has read the update image and performed a firmware update of the network core:
 
    .. code-block:: console
 

@@ -183,11 +183,11 @@ Then, in the mobile app, do the following:
 
 * Find and select the :guilabel:`Mesh DFU Distributor` device.
 * Go to the :guilabel:`Image` tab.
-* Press the :guilabel:`ADVANCED` button in the right top corner.
+* Tap the :guilabel:`Advanced` button in the right top corner.
   This will allow uploading the image to slot-1 without swapping the image on the Distributor.
-* Under the :guilabel:`Firmware Upload` area, press the :guilabel:`SELECT FILE` button and select the copied image.
-* Press the :guilabel:`UPLOAD` button.
-* Select :guilabel:`Application Core (0)` and tap :guilabel:`OK`.
+* Under the :guilabel:`Image Upload` area, tap the :guilabel:`Select File` button and select the copied image.
+* Tap the :guilabel:`Start` button.
+* Select :guilabel:`target.signed.bin`.
 
 Once the image upload is done, the :guilabel:`State` field is set to UPLOAD COMPLETE.
 
@@ -236,6 +236,25 @@ Logging
 In this sample, the UART console is occupied by the shell module.
 Therefore, it uses SEGGER RTT as a logging backend.
 For the convenience, ``printk`` is also duplicated to SEGGER RTT.
+
+External flash support
+======================
+
+This sample supports external flash memory as secondary storage partition for saving of the firmware images, both as for self update as well as for distribution.
+See :ref:`ug_bootloader_external_flash` for more information on external flash support as a partition in the :ref:`ug_bootloader_mcuboot_nsib`.
+The default configuration does not support external flash memory.
+To enable external flash support, set :makevar:`FILE_SUFFIX` to ``ext_flash`` when building the sample.
+
+Build the sample using the following command:
+
+.. code-block:: console
+
+   west build -p -b *board_name* -- -DFILE_SUFFIX=ext_flash
+
+.. note::
+   The external flash is not erased during the internal flash erasing procedure.
+   See `nRF Util`_ for more information on how to erase the external flash.
+   Currently, only the external flash on the ``nrf52840dk/nrf52840`` board is supported at the moment.
 
 Dependencies
 ************

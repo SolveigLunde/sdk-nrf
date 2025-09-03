@@ -52,15 +52,9 @@ static bool is_cellid_valid(uint32_t cellid)
 	return true;
 }
 
-#if defined(CONFIG_UNITY)
-int parse_cereg(const char *at_response, enum lte_lc_nw_reg_status *reg_status,
-		       struct lte_lc_cell *cell, enum lte_lc_lte_mode *lte_mode,
-		       struct lte_lc_psm_cfg *psm_cfg)
-#else
 static int parse_cereg(const char *at_response, enum lte_lc_nw_reg_status *reg_status,
 		       struct lte_lc_cell *cell, enum lte_lc_lte_mode *lte_mode,
 		       struct lte_lc_psm_cfg *psm_cfg)
-#endif /* CONFIG_UNITY */
 {
 	int err, temp;
 	struct at_parser parser;
@@ -299,6 +293,9 @@ static void at_handler_cereg(const char *response)
 			break;
 		case LTE_LC_LTE_MODE_NBIOT:
 			LTE_LC_TRACE(LTE_LC_TRACE_LTE_MODE_UPDATE_NBIOT);
+			break;
+		case LTE_LC_LTE_MODE_NTN_NBIOT:
+			LTE_LC_TRACE(LTE_LC_TRACE_LTE_MODE_UPDATE_NTN_NBIOT);
 			break;
 		case LTE_LC_LTE_MODE_NONE:
 			LTE_LC_TRACE(LTE_LC_TRACE_LTE_MODE_UPDATE_NONE);

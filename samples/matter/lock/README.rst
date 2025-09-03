@@ -43,7 +43,7 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for the ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, and ``nrf54l15dk/nrf54l15/cpuapp`` board targets.
+* Matter over Thread is supported for the ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, ``nrf54l15dk/nrf54l15/cpuapp`` and ``nrf54lm20dk/nrf54lm20a/cpuapp`` board targets.
 * Matter over Wi-Fi is supported for the ``nrf5340dk/nrf5340/cpuapp`` board target with the ``nrf7002ek`` shield attached, for the ``nrf7002dk/nrf5340/cpuapp`` (2.4 GHz and 5 GHz), or ``nrf7002dk/nrf5340/cpuapp/nrf7001`` board targets (2.4 GHz only).
 * :ref:`Switching between Matter over Thread and Matter over Wi-Fi <matter_lock_sample_wifi_thread_switching>` is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002ek`` shield attached, using the :ref:`switched Thread and Wi-Fi configuration <matter_lock_sample_custom_configs>`.
 
@@ -118,25 +118,6 @@ Instead, the factory reset and recommissioning to a Matter fabric allows the dev
 .. matter_door_lock_sample_thread_wifi_switch_desc_end
 
 See :ref:`matter_lock_sample_custom_configs` and :ref:`matter_lock_sample_switching_thread_wifi` for more information about how to configure and test this feature with this sample.
-
-Wi-Fi firmware on external memory
----------------------------------
-
-.. matter_door_lock_sample_nrf70_firmware_patch_start
-
-You can program a portion of the application code related to the nRF70 Series' Wi-Fi firmware onto an external memory to free up space in the on-chip memory.
-This option is available only when building for the nRF5340 DK with the nRF7002 EK shield attached.
-To prepare an application to use this feature, you need to create additional MCUboot partitions.
-To learn how to configure MCUboot partitions, see the :ref:`nrf70_fw_patch_update_adding_partitions` guide.
-To enable this feature for Matter, set the ``SB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE``, ``SB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH`` Kconfig options to ``y``, and set the ``SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES`` Kconfig option to ``3``.
-
-.. matter_door_lock_sample_nrf70_firmware_patch_end
-
-For example:
-
-   .. code-block:: console
-
-      west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dlock_SHIELD=nrf7002ek  -DFILE_SUFFIX=thread_wifi_switched -DSB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE=y -DSB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES=3 -DCONFIG_CHIP_DFU_OVER_BT_SMP=y -DSB_CONFIG_WIFI_NRF70=y -DSB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH=y
 
 .. _matter_lock_sample_ble_nus:
 
@@ -293,7 +274,7 @@ Device Firmware Upgrade support
 
    .. note::
       You can enable over-the-air Device Firmware Upgrade only on hardware platforms that have external flash memory.
-      Currently only nRF52840 DK, nRF5340 DK, nRF7002 DK and nRF54L15 DK support Device Firmware Upgrade feature.
+      Currently only nRF52840 DK, nRF5340 DK, nRF7002 DK, nRF54L15 DK and nRF54LM20 DK support Device Firmware Upgrade feature.
 
    The sample supports over-the-air (OTA) device firmware upgrade (DFU) using one of the two following protocols:
 
@@ -348,7 +329,7 @@ Factory data support
    To disable factory data support, set the following Kconfig options to ``n``:
 
    * :kconfig:option:`CONFIG_CHIP_FACTORY_DATA`
-   * ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE``
+   * :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`
 
    To learn more about factory data, read the :doc:`matter:nrfconnect_factory_data_configuration` page in the Matter documentation.
 
@@ -454,6 +435,16 @@ Building and running
 .. include:: /includes/ipc_radio_conf.txt
 
 See `Configuration`_ for information about building the sample with the DFU support.
+
+Building the Matter over Wi-Fi sample variant on nRF5340 DK with nRF7002 EK shield
+==================================================================================
+
+.. include:: /includes/matter_building_nrf5340dk_70ek
+
+Flashing the Matter over Wi-Fi sample variant
+=============================================
+
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a configuration
 =========================

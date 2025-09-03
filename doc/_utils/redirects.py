@@ -210,8 +210,9 @@ NRF = [
     ("device_guides/nrf70/nrf7002eb_dev_guide", "app_dev/device_guides/nrf70/nrf7002eb_dev_guide"),
     ("device_guides/nrf54l", "app_dev/device_guides/nrf54l/index"), # Developing with nRF54L Series
     ("app_dev/device_guides/nrf54l", "app_dev/device_guides/nrf54l/index"),
-    ("device_guides/working_with_nrf/nrf54l/features", "app_dev/device_guides/nrf54l/features"), # Features of the nRF54L15 PDK
-    ("app_dev/device_guides/working_with_nrf/nrf54l/features", "app_dev/device_guides/nrf54l/features"),
+    ("device_guides/working_with_nrf/nrf54l/features", "app_dev/device_guides/nrf54l/index"), # Features of the nRF54L15 DK
+    ("app_dev/device_guides/working_with_nrf/nrf54l/features", "app_dev/device_guides/nrf54l/index"),
+    ("app_dev/device_guides/nrf54l/features", "app_dev/device_guides/nrf54l/index"),
     ("device_guides/working_with_nrf/nrf54l/nrf54l15_gs", "gsg_guides"), # Getting started with nRF54L15 PDK (removed after 2.8.0)
     ("app_dev/device_guides/working_with_nrf/nrf54l/nrf54l15_gs", "gsg_guides"),
     ("device_guides/working_with_nrf/nrf54l/testing_dfu", "app_dev/device_guides/nrf54l/fota_update"), # Testing the DFU solution (removed after 2.8.0)
@@ -360,6 +361,7 @@ NRF = [
     ("ug_matter_gs_testing_thread_separate_otbr_android", "protocols/matter/getting_started/testing/index"), # Matter over Thread: Configuring Border Router and Android controller on separate devices (removed after 2.2.0)
     ("ug_matter_gs_testing_wifi_mobile", "protocols/matter/getting_started/testing/index"), # Matter over Wi-Fi: Configuring CHIP Tool for Android (removed after 2.2.0)
     ("ug_matter_gs_tools", "protocols/matter/getting_started/tools"), # Matter tools
+    ("protocols/matter/getting_started/manufacturer_cluster_editor_tool", "protocols/matter/getting_started/tools"), # Matter Cluster Editor tool page (removed for v3.1.0)
     ("ug_matter_gs_kconfig", "protocols/matter/getting_started/kconfig"), # Enabling Matter in Kconfig
     ("ug_matter_gs_advanced_kconfigs", "protocols/matter/getting_started/advanced_kconfigs"), # Advanced Matter Kconfig options
     ("ug_matter_gs_adding_clusters", "protocols/matter/getting_started/adding_clusters"), # Adding clusters to Matter application
@@ -440,6 +442,8 @@ NRF = [
     ("samples/wifi/sr_coex/README", "samples/wifi/ble_coex/README"), # Wi-Fi: Bluetooth LE coexistence
     ("samples/samples_zigbee", "samples/zigbee"), # Zigbee samples (landing)
     ("samples/samples_other", "samples/other"), # Other samples (landing)
+    ("samples/pmic/native/npm1300_fuel_gauge/README", "samples/pmic/native/npm13xx_fuel_gauge/README"),
+    ("samples/pmic/native/npm1300_one_button/README", "samples/pmic/native/npm13xx_one_button/README"),
     ("libraries/bluetooth_services/index", "libraries/bluetooth/index"), # Changed the folder name libraries/bluetooth_services to libraries/bluetooth to better match the include folder structure
     ("libraries/bluetooth_services/adv_prov", "libraries/bluetooth/adv_prov"),
     ("libraries/bluetooth_services/conn_ctx", "libraries/bluetooth/conn_ctx"),
@@ -526,7 +530,8 @@ NRF = [
     ("libraries/bluetooth_services/services/cts_client", "libraries/bluetooth/services/cts_client"),
     ("libraries/bluetooth_services/services/ddfs", "libraries/bluetooth/services/ddfs"),
     ("libraries/bluetooth_services/services/dfu_smp", "libraries/bluetooth/services/dfu_smp"),
-    ("libraries/bluetooth_services/services/fast_pair", "libraries/bluetooth/services/fast_pair"),
+    ("libraries/bluetooth_services/services/fast_pair", "libraries/bluetooth/services/fast_pair/core"),
+    ("libraries/bluetooth/services/fast_pair", "libraries/bluetooth/services/fast_pair/core"),
     ("libraries/bluetooth_services/services/gattp", "libraries/bluetooth/services/gattp"),
     ("libraries/bluetooth_services/services/hids", "libraries/bluetooth/services/hids"),
     ("libraries/bluetooth_services/services/hogp", "libraries/bluetooth/services/hogp"),
@@ -540,7 +545,8 @@ NRF = [
     ("libraries/bluetooth_services/services/nus_client", "libraries/bluetooth/services/nus_client"),
     ("libraries/bluetooth_services/services/rscs", "libraries/bluetooth/services/rscs"),
     ("libraries/bluetooth_services/services/throughput", "libraries/bluetooth/services/throughput"),
-    ("libraries/bluetooth_services/services/wifi_prov", "libraries/bluetooth/services/wifi_prov"),
+    ("libraries/bluetooth_services/services/wifi_prov", "libraries/bluetooth/services/wifi_prov_ble"),
+    ("libraries/bluetooth/services/wifi_prov", "libraries/bluetooth/services/wifi_prov_ble"),
     ("libraries/networking/nrf_cloud_agps", "libraries/networking/nrf_cloud_agnss"), # nRF Cloud A-GNSS
     ("libraries/bootloader/index", "libraries/security/bootloader/index"), # Bootloader libraries (landing)
     ("libraries/bootloader/bl_crypto", "libraries/security/bootloader/bl_crypto"), # Bootloader crypto
@@ -553,15 +559,18 @@ NRF = [
     ("libraries/nrf_security/doc/configuration", "libraries/security/nrf_security/doc/configuration"), # Configuration
     ("libraries/nrf_security/doc/driver_config", "security/crypto/driver_config"), # Feature configurations and driver support (moved to security/crypto for v3.1.0)
     ("libraries/security/nrf_security/doc/driver_config", "security/crypto/driver_config"),
-    ("libraries/nrf_security/doc/mbed_tls_header", "libraries/security/nrf_security/doc/mbed_tls_header"), # User-provided Mbed TLS configuration header
+    ("libraries/nrf_security/doc/mbed_tls_header", "libraries/security/nrf_security/index"), # User-provided Mbed TLS configuration header (removed in v3.1.0)
+    ("libraries/security/nrf_security/doc/mbed_tls_header", "libraries/security/nrf_security/index"), # User-provided Mbed TLS configuration header (removed in v3.1.0)
     ("libraries/nrf_security/doc/backend_config", "libraries/security/nrf_security/doc/backend_config"), # Legacy configurations and supported features
     ("libraries/tfm/index", "libraries/security/tfm/index"), # TF-M libraries (landing)
     ("libraries/tfm/tfm_ioctl_api", "libraries/security/tfm/tfm_ioctl_api"), # TF-M input/output control (IOCTL)
+    ("libraries/nrf_rpc/nrf_rpc_dev_info", "libraries/nrf_rpc/nrf_rpc_utils"), # Moved nRF RPC device information to nRF RPC utility commands library (v3.1.0)
     ("libraries/others/fatal_error", "libraries/security/fatal_error"), # Fatal error handler
     ("libraries/others/hw_unique_key", "libraries/security/hw_unique_key"), # Hardware unique key
     ("libraries/others/identity_key", "libraries/security/identity_key"), # Identity key
     ("ecosystems_integrations", "integrations"), # Integrations (landing)
-    ("ug_bt_fast_pair", "external_comp/bt_fast_pair"), # Google Fast Pair integration
+    ("ug_bt_fast_pair", "external_comp/bt_fast_pair/index"), # Google Fast Pair integration
+    ("external_comp/bt_fast_pair", "external_comp/bt_fast_pair/index"),
     ("ug_edge_impulse", "external_comp/edge_impulse"), # Edge Impulse integration
     ("ug_memfault", "external_comp/memfault"), # Memfault integration
     ("ug_nrf_cloud", "external_comp/nrf_cloud"), # Using nRF Cloud with the nRF Connect SDK
@@ -599,7 +608,8 @@ NRF = [
     # 54H new links
     ("device_guides/nrf54h", "app_dev/device_guides/nrf54h/index"), # Developing with nRF54H Series
     ("app_dev/device_guides/nrf54h", "app_dev/device_guides/nrf54h/index"),  # Developing with nRF54H Series
-    ("app_dev/device_guides/working_with_nrf/nrf54h/ug_nrf54h20_app_samples", "app_dev/device_guides/nrf54h/ug_nrf54h20_app_samples"), # nRF54H20 applications and samples (orphaned as of 2.7.0)
+    ("app_dev/device_guides/working_with_nrf/nrf54h/ug_nrf54h20_app_samples", "samples"), # nRF54H20 applications and samples (orphaned as of 2.7.0)
+    ("app_dev/device_guides/nrf54h/ug_nrf54h20_app_samples", "samples"), # nRF54H20 applications and samples (orphaned as of 2.7.0)
     ("app_dev/device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture"), # Architecture of nRF54H20 (landing)
     ("app_dev/device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture_boot", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture_boot"), # nRF54H20 Boot Sequence
     ("app_dev/device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture_clockman", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture_clockman"), # nRF54H20 clock management
@@ -637,7 +647,7 @@ NRF = [
     # 54H legacy links
     ("device_guides/nrf54h", "app_dev/device_guides/nrf54h"), # Developing with nRF54H Series
     ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_gs",  "app_dev/device_guides/nrf54h/ug_nrf54h20_gs"), # Getting started with the nRF54H20 DK
-    ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_app_samples", "app_dev/device_guides/nrf54h/ug_nrf54h20_app_samples"), # nRF54H20 applications and samples (orphaned as of 2.7.0)
+    ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_app_samples", "samples"), # nRF54H20 applications and samples (orphaned as of 2.7.0)
     ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture"), # Architecture of nRF54H20 (landing)
     ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture_cpu", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture_cpu"), # nRF54H20 Domains
     ("device_guides/working_with_nrf/nrf54h/ug_nrf54h20_architecture_memory", "app_dev/device_guides/nrf54h/ug_nrf54h20_architecture_memory"), # nRF54H20 Memory Layout

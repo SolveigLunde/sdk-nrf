@@ -6,22 +6,9 @@
     - net.lib.wifi_credentials_backend_psa
   comment: "Fix not known at time of upmerge, temporarily excluded to be fixed after upmerge"
 
-- scenarios:
-    - sample.nrf7002.shell.otbr
-  platforms:
-    - nrf7002dk/nrf5340/cpuapp
-  comment: https://nordicsemi.atlassian.net/browse/NCSDK-31155
-
 - platforms:
     - native_posix
   comment: "native_posix will be removed soon - native_sim platform is the default simulator now"
-
-- scenarios:
-    - sample.benchmark.coremark.heap_memory
-    - sample.benchmark.coremark.multiple_threads
-  platforms:
-    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
-  comment: "https://nordicsemi.atlassian.net/browse/NCSDK-31409"
 
 - scenarios:
     - sample.matter.light_bulb.aws
@@ -34,6 +21,13 @@
     - applications.matter_bridge.br_ble.memory_profiling
     - applications.matter_bridge.memory_profiling
   comment: "Variant does not fit in FLASH area - it should be probably removed in the future"
+
+- scenarios:
+    - sample.matter.light_bulb.memory_profiling
+  platforms:
+    - nrf7002dk/nrf5340/cpuapp
+  comment: "https://nordicsemi.atlassian.net/browse/KRKNWK-20715"
+
 
 - scenarios:
     - nrf.extended.drivers.uart.uart_elementary_dual_l09
@@ -87,3 +81,10 @@
   platforms:
     - nrf54h20dk@0.9.0/nrf54h20/cpuapp
   comment: "https://nordicsemi.atlassian.net/browse/NCSDK-34187"
+
+- scenarios:
+    - sample.benchmark.coremark.heap_memory
+    - sample.benchmark.coremark.multiple_threads
+  platforms:
+    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
+  comment: "https://nordicsemi.atlassian.net/browse/NCSDK-31463"

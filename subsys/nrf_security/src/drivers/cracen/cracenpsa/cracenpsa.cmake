@@ -21,9 +21,14 @@ list(APPEND cracen_driver_sources
   # Note: We always need to have cipher.c and ctr_drbg.c since it
   # is used directly by many Cracen drivers.
   ${CMAKE_CURRENT_LIST_DIR}/src/cipher.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/ctr_drbg.c
   ${CMAKE_CURRENT_LIST_DIR}/src/prng_pool.c
 )
+
+if(NOT CONFIG_PSA_CRYPTO_DRIVER_ALG_PRNG_TEST)
+  list(APPEND cracen_driver_sources
+    ${CMAKE_CURRENT_LIST_DIR}/src/ctr_drbg.c
+  )
+endif()
 
 if(CONFIG_CRACEN_IKG)
   list(APPEND cracen_driver_sources
@@ -90,7 +95,7 @@ if(CONFIG_PSA_NEED_CRACEN_MAC_DRIVER)
   endif()
 
   if(CONFIG_PSA_NEED_CRACEN_CMAC)
-    if(CONFIG_CRACEN_USE_MULTIPART_WORKAROUNDS)
+    if(CONFIG_CRACEN_NEED_MULTIPART_WORKAROUNDS)
       list(APPEND cracen_driver_sources
         ${CMAKE_CURRENT_LIST_DIR}/src/cracen_sw_mac_cmac.c
       )

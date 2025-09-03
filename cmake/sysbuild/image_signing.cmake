@@ -124,12 +124,11 @@ function(zephyr_mcuboot_tasks)
     set(imgtool_hex_extra)
   endif()
 
-  if(CONFIG_SOC_SERIES_NRF54LX AND CONFIG_MCUBOOT_BOOTLOADER_SIGNATURE_TYPE_ED25519)
-    if(NOT CONFIG_MCUBOOT_BOOTLOADER_SIGNATURE_TYPE_PURE)
-      set(imgtool_extra --sha 512 ${imgtool_extra})
-    else()
-      set(imgtool_extra --pure ${imgtool_extra})
-    endif()
+  # Set proper hash calculation algorithm for signing
+  if(CONFIG_MCUBOOT_BOOTLOADER_SIGNATURE_TYPE_PURE)
+    set(imgtool_extra --pure ${imgtool_extra})
+  elseif(CONFIG_MCUBOOT_BOOTLOADER_USES_SHA512)
+    set(imgtool_extra --sha 512 ${imgtool_extra})
   endif()
 
   if(CONFIG_MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION)
@@ -158,6 +157,12 @@ function(zephyr_mcuboot_tasks)
   set(unconfirmed_args)
   set(confirmed_args)
   set(encrypted_args)
+
+  if(NOT "${keyfile_enc}" STREQUAL "")
+    if(CONFIG_MCUBOOT_ENCRYPTION_ALG_AES_256)
+      set(imgtool_args ${imgtool_args} --encrypt-keylen 256)
+    endif()
+  endif()
 
   # Set up .bin outputs.
   if(CONFIG_BUILD_OUTPUT_BIN)
@@ -197,8 +202,18 @@ function(zephyr_mcuboot_tasks)
           CACHE FILEPATH "Signed and encrypted kernel bin file" FORCE
       )
 
+      # Signature type determines key exchange scheme; ED25519 here means
+      # ECIES-X25519 is used. Default to HMAC-SHA512 for ECIES-X25519.
+      # Only .encrypted.bin file gets the ENCX25519/ENCX25519_SHA512, the
+      # just signed one does not.
+      # Only NRF54L gets the HMAC-SHA512, other remain with previously used
+      # SHA256.
+      if(CONFIG_SOC_SERIES_NRF54LX AND CONFIG_MCUBOOT_BOOTLOADER_SIGNATURE_TYPE_ED25519)
+        set(imgtool_hmac_args --hmac-sha 512)
+      endif()
+
       set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
-        ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" ${imgtool_bin_extra} ${unconfirmed_args})
+        ${imgtool_sign} ${imgtool_args} ${imgtool_hmac_args} --encrypt "${keyfile_enc}" ${imgtool_bin_extra} ${unconfirmed_args})
     endif()
   endif()
 
@@ -230,6 +245,14 @@ function(zephyr_mcuboot_tasks)
       set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
         ${imgtool_sign} ${imgtool_args} ${imgtool_directxip_hex_command} ${imgtool_hex_extra} ${unconfirmed_args})
     else()
+      # Signature type determines key exchange scheme; ED25519 here means
+      # ECIES-X25519 is used. Default to HMAC-SHA512 for ECIES-X25519.
+      # Only NRF54L gets the HMAC-SHA512, other remain with previously used
+      # SHA256.
+      if((CONFIG_SOC_NRF54L15_CPUAPP OR CONFIG_SOC_NRF54L10_CPUAPP OR CONFIG_SOC_NRF54L05_CPUAPP OR CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP) AND CONFIG_MCUBOOT_BOOTLOADER_SIGNATURE_TYPE_ED25519)
+        set(imgtool_args ${imgtool_args} --hmac-sha 512)
+      endif()
+
       set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
         ${imgtool_sign} ${imgtool_args} --encrypt "${keyfile_enc}" --clear
         ${imgtool_directxip_hex_command} ${imgtool_hex_extra} ${unconfirmed_args})

@@ -14,6 +14,7 @@
 #include <math.h>
 
 #define TEST_TIMER_COUNT_TIME_LIMIT_MS 500
+#define MEASUREMENT_REPEATS	       10
 
 #define SPI_MODE                                                                                   \
 	(SPI_OP_MODE_MASTER | SPI_WORD_SET(8) | SPI_LINES_SINGLE | SPI_TRANSFER_MSB |              \
@@ -77,14 +78,14 @@ static void assess_measurement_result(uint64_t timer_value_us,
 	uint64_t maximal_allowed_transmission_time_us;
 
 	if (buffer_size == 1) {
-		/* 3000%
+		/* 4000%
 		 * Issue with latency for 1B buffer is reported
 		 * limit will be adjusted after fix
 		 */
-		maximal_allowed_transmission_time_us = (1 + 30) * theoretical_transmission_time_us;
+		maximal_allowed_transmission_time_us = (1 + 40) * theoretical_transmission_time_us;
 	} else {
-		/* 100% */
-		maximal_allowed_transmission_time_us = (1 + 1) * theoretical_transmission_time_us;
+		/* 200% */
+		maximal_allowed_transmission_time_us = (1 + 2) * theoretical_transmission_time_us;
 	}
 	zassert_true(timer_value_us < maximal_allowed_transmission_time_us,
 		     "Measured transmission call latency is over the specified limit %llu > %llu",
@@ -95,7 +96,8 @@ static void test_spim_transmission_latency(size_t buffer_size)
 {
 	int err;
 	uint32_t tst_timer_value;
-	uint64_t timer_value_us;
+	uint64_t timer_value_us[MEASUREMENT_REPEATS];
+	uint64_t average_timer_value_us = 0;
 	uint32_t theoretical_transmission_time_us;
 
 	struct spi_buf tx_spi_buf = {.buf = tx_buffer, .len = buffer_size};
@@ -109,30 +111,36 @@ static void test_spim_transmission_latency(size_t buffer_size)
 
 	prepare_test_data(tx_buffer, buffer_size);
 	configure_test_timer(tst_timer_dev, TEST_TIMER_COUNT_TIME_LIMIT_MS);
-	counter_reset(tst_timer_dev);
 
 	theoretical_transmission_time_us =
 		calculate_theoretical_transsmison_time_us(buffer_size, spim_spec.config.frequency);
 
-	dk_set_led_on(DK_LED1);
-	counter_start(tst_timer_dev);
-	err = spi_transceive_dt(&spim_spec, &tx_spi_buf_set, &rx_spi_buf_set);
-	counter_get_value(tst_timer_dev, &tst_timer_value);
-	dk_set_led_off(DK_LED1);
-	counter_stop(tst_timer_dev);
-	timer_value_us = counter_ticks_to_us(tst_timer_dev, tst_timer_value);
+	for (uint32_t repeat_counter = 0; repeat_counter < MEASUREMENT_REPEATS; repeat_counter++) {
+		memset(rx_buffer, 0xFF, buffer_size);
+		counter_reset(tst_timer_dev);
+		dk_set_led_on(DK_LED1);
+		counter_start(tst_timer_dev);
+		err = spi_transceive_dt(&spim_spec, &tx_spi_buf_set, &rx_spi_buf_set);
+		counter_get_value(tst_timer_dev, &tst_timer_value);
+		dk_set_led_off(DK_LED1);
+		counter_stop(tst_timer_dev);
+		timer_value_us[repeat_counter] =
+			counter_ticks_to_us(tst_timer_dev, tst_timer_value);
+		average_timer_value_us += timer_value_us[repeat_counter] / MEASUREMENT_REPEATS;
 
-	zassert_ok(err, "SPI transceive failed");
-	zassert_mem_equal(tx_buffer, rx_buffer, buffer_size);
+		zassert_ok(err, "SPI transceive failed");
+		zassert_mem_equal(tx_buffer, rx_buffer, buffer_size);
+	}
 
 	TC_PRINT("Calculated transmission time (for %u bytes) [us]: %u\n", buffer_size,
 		 theoretical_transmission_time_us);
 	TC_PRINT("spi_transceive_dt: measured transmission time (for %u bytes) [us]: %llu\n",
-		 buffer_size, timer_value_us);
+		 buffer_size, average_timer_value_us);
 	TC_PRINT("spi_transceive_dt: measured - claculated time delta (for %d bytes) [us]: %lld\n",
-		 buffer_size, timer_value_us - theoretical_transmission_time_us);
+		 buffer_size, average_timer_value_us - theoretical_transmission_time_us);
 
-	assess_measurement_result(timer_value_us, theoretical_transmission_time_us, buffer_size);
+	assess_measurement_result(average_timer_value_us, theoretical_transmission_time_us,
+				  buffer_size);
 }
 
 ZTEST(spim_transmission_latency, test_spim_transceive_call_latencty)

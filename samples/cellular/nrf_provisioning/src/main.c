@@ -18,12 +18,16 @@
 
 LOG_MODULE_REGISTER(nrf_provisioning_sample, CONFIG_NRF_PROVISIONING_SAMPLE_LOG_LEVEL);
 
-#define NETWORK_UP			    BIT(0)
+#define NETWORK_UP			BIT(0)
 #define NETWORK_DOWN			BIT(1)
 #define PROVISIONING_IDLE		BIT(2)
+#define NETWORK_IPV4_CONNECTED		BIT(3)
+#define NETWORK_IPV6_CONNECTED		BIT(4)
 #define NORMAL_REBOOT_S		    10
 #define PROVISIONING_IDLE_DELAY_S	3
-#define EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+#define EVENT_MASK                                                                                 \
+	(NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED | NET_EVENT_L4_IPV6_CONNECTED |        \
+	 NET_EVENT_L4_IPV4_CONNECTED)
 
 static K_EVENT_DEFINE(prov_events);
 
@@ -41,6 +45,11 @@ static int modem_mode_cb(enum lte_lc_func_mode new_mode, void *user_data)
 		return -EFAULT;
 	}
 
+	if (new_mode == fmode) {
+		LOG_DBG("Functional mode unchanged: %d", fmode);
+		return fmode;
+	}
+
 	if (new_mode == LTE_LC_FUNC_MODE_NORMAL || new_mode == LTE_LC_FUNC_MODE_ACTIVATE_LTE) {
 		LOG_INF("Provisioning library requests normal mode");
 
@@ -49,7 +58,9 @@ static int modem_mode_cb(enum lte_lc_func_mode new_mode, void *user_data)
 
 		/* Wait for network readiness to be re-established before returning. */
 		LOG_DBG("Waiting for network up");
-		k_event_wait(&prov_events, NETWORK_UP, false, K_FOREVER);
+		k_event_wait(&prov_events, NETWORK_IPV4_CONNECTED, false, K_FOREVER);
+		/* Wait extra 2 seconds for IPv6 negotiation */
+		k_event_wait(&prov_events, NETWORK_IPV6_CONNECTED, false, K_SECONDS(2));
 
 		LOG_DBG("Network is up.");
 	}
@@ -74,6 +85,23 @@ static int modem_mode_cb(enum lte_lc_func_mode new_mode, void *user_data)
 		k_event_wait(&prov_events, NETWORK_DOWN, false, K_FOREVER);
 
 		LOG_DBG("Network is down.");
+
+		/* conn_mgr disables only LTE connectivity. GNSS may remain active.
+		 * Ensure GNSS is also disabled before storing credentials to the modem.
+		 */
+		enum lte_lc_func_mode current_mode;
+
+		if (lte_lc_func_mode_get(&current_mode)) {
+			LOG_ERR("Failed to read modem functional mode");
+			return -EFAULT;
+		}
+		if (current_mode == LTE_LC_FUNC_MODE_ACTIVATE_GNSS) {
+			LOG_WRN("GNSS is still active. Deactivating GNSS.");
+			if (lte_lc_func_mode_set(LTE_LC_FUNC_MODE_DEACTIVATE_GNSS)) {
+				LOG_ERR("Failed to deactivate GNSS");
+				return -EFAULT;
+			}
+		}
 	}
 
 	return fmode;
@@ -133,46 +161,40 @@ static void device_mode_cb(enum nrf_provisioning_event event, void *user_data)
 static struct nrf_provisioning_mm_change mmode = { .cb = modem_mode_cb, .user_data = NULL };
 static struct nrf_provisioning_dm_change dmode = { .cb = device_mode_cb, .user_data = NULL };
 
-/* Work item to initialize the provisioning library and start checking for provisioning commands.
- * Called automatically the first time network connectivity is established.
- * Needs to be a work item since nrf_provisioning_init may attempt to install certs in a blocking
- * fashion.
- */
-static void start_provisioning_work_fn(struct k_work *work)
-{
-	LOG_INF("Initializing the nRF Provisioning library...");
-
-	int ret = nrf_provisioning_init(&mmode, &dmode);
-
-	if (ret) {
-		LOG_ERR("Failed to initialize provisioning client, error: %d", ret);
-	}
-}
-
-static K_WORK_DEFINE(start_provisioning_work, start_provisioning_work_fn);
-
 /* Callback to track network connectivity */
 static struct net_mgmt_event_callback l4_callback;
 static void l4_event_handler(struct net_mgmt_event_callback *cb,
-			     uint32_t event, struct net_if *iface)
+			     uint64_t event, struct net_if *iface)
 {
 	if ((event & EVENT_MASK) != event) {
 		return;
 	}
 
-	if (event == NET_EVENT_L4_CONNECTED) {
+	if (event == NET_EVENT_L4_IPV4_CONNECTED) {
+		/* Mark network as up. */
+		LOG_INF("IPv4 connectivity gained!");
+		k_event_clear(&prov_events, NETWORK_DOWN);
+		k_event_post(&prov_events, NETWORK_IPV4_CONNECTED);
+	} else if (event == NET_EVENT_L4_IPV6_CONNECTED) {
+		/* Mark network as up. */
+		LOG_INF("IPv6 connectivity gained!");
+		k_event_clear(&prov_events, NETWORK_DOWN);
+		k_event_post(&prov_events, NETWORK_IPV6_CONNECTED);
+	} else if (event == NET_EVENT_L4_CONNECTED) {
 		/* Mark network as up. */
 		LOG_INF("Network connectivity gained!");
 		k_event_clear(&prov_events, NETWORK_DOWN);
 		k_event_post(&prov_events, NETWORK_UP);
 
-		/* Start the provisioning library after network readiness is first established.
-		 * We offload this to a workqueue item to avoid a deadlock.
-		 * (nrf_provisioning_init might attempt to install certs, and in the process,
-		 * trigger a blocking wait for L4_DOWN, which cannot fire until this handler exits.)
-		 */
+		/* Start the provisioning library after network readiness is first established. */
 		if (!provisioning_started) {
-			k_work_submit(&start_provisioning_work);
+			LOG_INF("Initializing the nRF Provisioning library...");
+
+			int ret = nrf_provisioning_init(&mmode, &dmode);
+
+			if (ret) {
+				LOG_ERR("Failed to initialize provisioning client, error: %d", ret);
+			}
 			provisioning_started = true;
 		}
 	}
@@ -180,7 +202,8 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb,
 	if (event == NET_EVENT_L4_DISCONNECTED) {
 		/* Mark network as down. */
 		LOG_INF("Network connectivity lost!");
-		k_event_clear(&prov_events, NETWORK_UP);
+		k_event_clear(&prov_events,
+			      NETWORK_UP | NETWORK_IPV4_CONNECTED | NETWORK_IPV6_CONNECTED);
 		k_event_post(&prov_events, NETWORK_DOWN);
 	}
 }

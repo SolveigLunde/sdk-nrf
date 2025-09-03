@@ -165,6 +165,18 @@ static void ranging_data_cb(struct bt_conn *conn, uint16_t ranging_counter, int 
 
 	LOG_DBG("Ranging data received for ranging counter %d", ranging_counter);
 
+	if (latest_local_steps.len == 0) {
+		LOG_WRN("All subevents in ranging counter %u were aborted",
+			most_recent_local_ranging_counter);
+		net_buf_simple_reset(&latest_local_steps);
+		k_sem_give(&sem_local_steps);
+
+		if (!(ras_feature_bits & RAS_FEAT_REALTIME_RD)) {
+			net_buf_simple_reset(&latest_peer_steps);
+		}
+		return;
+	}
+
 	/* This struct is static to avoid putting it on the stack (it's very large) */
 	static cs_de_report_t cs_de_report;
 
@@ -347,13 +359,13 @@ static void connected_cb(struct bt_conn *conn, uint8_t err)
 	if (err) {
 		bt_conn_unref(conn);
 		connection = NULL;
+	} else {
+		connection = bt_conn_ref(conn);
+
+		k_sem_give(&sem_connected);
+
+		dk_set_led_on(CON_STATUS_LED);
 	}
-
-	connection = bt_conn_ref(conn);
-
-	k_sem_give(&sem_connected);
-
-	dk_set_led_on(CON_STATUS_LED);
 }
 
 static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
@@ -679,7 +691,7 @@ int main(void)
 		.min_subevent_len = 60000,
 		.max_subevent_len = 60000,
 		.tone_antenna_config_selection = BT_LE_CS_TONE_ANTENNA_CONFIGURATION_A1_B1,
-		.phy = BT_LE_CS_PROCEDURE_PHY_1M,
+		.phy = BT_LE_CS_PROCEDURE_PHY_2M,
 		.tx_power_delta = 0x80,
 		.preferred_peer_antenna = BT_LE_CS_PROCEDURE_PREFERRED_PEER_ANTENNA_1,
 		.snr_control_initiator = BT_LE_CS_SNR_CONTROL_NOT_USED,
@@ -710,8 +722,8 @@ int main(void)
 			for (uint8_t ap = 0; ap < MAX_AP; ap++) {
 				cs_de_dist_estimates_t distance_on_ap = get_distance(ap);
 
-				LOG_INF("Distance estimates on antenna path %u: ifft: %f, "
-					"phase_slope: %f, rtt: %f",
+				LOG_INF("Latest distance estimates on antenna path %u: ifft: %f, "
+					"phase_slope: %f, rtt: %f meters",
 					ap, (double)distance_on_ap.ifft,
 					(double)distance_on_ap.phase_slope,
 					(double)distance_on_ap.rtt);

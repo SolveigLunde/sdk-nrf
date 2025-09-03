@@ -41,6 +41,8 @@ config BT_LL_SOFTDEVICE
 	select BT_CTLR_LE_POWER_CONTROL_SUPPORT
 	select BT_CTLR_LE_PATH_LOSS_MONITORING_SUPPORT
 	select BT_CTLR_SUBRATING_SUPPORT
+	select BT_CTLR_EXTENDED_FEAT_SET_SUPPORT
+	select BT_CTLR_FRAME_SPACE_UPDATE_SUPPORT
 	select BT_LL_SOFTDEVICE_HEADERS_INCLUDE
 	select MRAM_LATENCY if (SOC_NRF54H20_CPURAD && !MPSL_PM_USE_MRAM_LATENCY_SERVICE)
 	select MRAM_LATENCY_AUTO_REQ if (SOC_NRF54H20_CPURAD && !MPSL_PM_USE_MRAM_LATENCY_SERVICE)
@@ -65,20 +67,13 @@ config BT_LL_SOFTDEVICE_BUILD_TYPE_LIB
 
 endchoice
 
-# BT_HCI_TX_STACK_SIZE is declared in Zephyr and also here for a second time,
-# for set the valid default size of the HCI Tx stack.
+# BT_HCI_TX_STACK_SIZE is declared in Zephyr
 config BT_HCI_TX_STACK_SIZE
 	# NOTE: This value is derived from other symbols and should only be
 	# changed if required by architecture
-	int
 	default 1536 if BT_LL_SOFTDEVICE
-	help
-	  Stack size needed for executing bt_send with specified driver.
-	  NOTE: This is an advanced setting and should not be changed unless
-	  absolutely necessary
 
 config BT_RX_STACK_SIZE
-	int
 	depends on BT_HCI_HOST
 	default 512 if BT_HCI_RAW
 	default 2600 if BT_MESH
@@ -89,13 +84,6 @@ config BT_RX_STACK_SIZE
 	range 512 65536 if BT_HCI_RAW
 	range 1100 65536 if BT_MESH
 	range 1024 65536
-	help
-	  Size of the receiving thread stack. This is the context from
-	  which all event callbacks to the application occur. The
-	  default value is sufficient for basic operation, but if the
-	  application needs to do advanced things in its callbacks that
-	  require extra stack space, this value can be increased to
-	  accommodate for that.
 
 # SYSTEM_WORKQUEUE_STACK_SIZE is declared in Zephyr and also here for a second
 # time, because Central side Bluetooth sample needs a different workqueue size
@@ -174,7 +162,9 @@ config BT_CTLR_SDC_CONN_EVENT_EXTEND_DEFAULT
 config BT_CTLR_SDC_CENTRAL_ACL_EVENT_SPACING_DEFAULT
 	int "Default central ACL event spacing [us]"
 	depends on BT_CENTRAL
+	default 110000 if BT_ISO && BT_CTLR_CHANNEL_SOUNDING
 	default 30000 if BT_ISO
+	default 90000 if BT_CTLR_CHANNEL_SOUNDING
 	default BT_CTLR_SDC_MAX_CONN_EVENT_LEN_DEFAULT
 	help
 	  On the central, sets the time ACL connections are spaced apart assuming that
@@ -221,6 +211,7 @@ config BT_CTLR_SDC_PERIODIC_ADV_EVENT_LEN_DEFAULT
 
 config BT_CTLR_SDC_TX_PACKET_COUNT
 	int "Number of Link Layer ACL TX buffers"
+	default BT_BUF_ACL_TX_COUNT if BT_MESH_GATT
 	default 3
 	range 1 20
 	help
@@ -316,6 +307,8 @@ choice BT_LL_SOFTDEVICE_VARIANT
 						     BT_CTLR_SDC_PAWR_SYNC || \
 						     BT_ISO || \
 						     BT_CTLR_CHANNEL_SOUNDING || \
+						     BT_CTLR_EXTENDED_FEAT_SET || \
+						     BT_CTLR_FRAME_SPACE_UPDATE || \
 						     SOC_COMPATIBLE_NRF5340_CPUNET || \
 						     SOC_NRF54H20_CPURAD || \
 						     (SOC_COMPATIBLE_NRF54LX && TRUSTED_EXECUTION_NONSECURE) || \
@@ -541,6 +534,12 @@ config BT_CTLR_SDC_CIS_SUBEVENT_LENGTH_US
 	  If this parameter is set to zero, the subevent length
 	  is chosen by the controller.
 
+config BT_CTLR_EXTENDED_FEAT_SET
+	select EXPERIMENTAL
+
+config BT_CTLR_FRAME_SPACE_UPDATE
+	select EXPERIMENTAL
+
 config BT_CTLR_CHANNEL_SOUNDING
 	bool "Channel Sounding support"
 	help
@@ -627,6 +626,13 @@ config BT_CTLR_SDC_CS_STEP_MODE3
 	help
 	  Enable optional step mode-3 support. Channel sounding will not automatically start using step mode-3 if this
 	  config is set. To use step mode-3, modify the configuration which is created using the LE CS Create config command.
+
+config BT_CTLR_SDC_CS_EVENT_LEN_DEFAULT
+	int "Default channel sounding event length [us]"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	default 5000
+	help
+	  The time set aside for channel sounding events in microseconds.
 
 config BT_CTLR_SDC_LE_POWER_CLASS_1
 	bool "Device supports transmitting at LE Power Class 1 level"

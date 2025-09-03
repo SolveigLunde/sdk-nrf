@@ -7,6 +7,10 @@ Performing KMU provisioning
    :local:
    :depth: 2
 
+.. note::
+
+   The nRF54LM20A SoC currently does not support KMU.
+
 The nRF54L devices are equipped with Hardware Key Management Unit (KMU), that requires provisioning when in use.
 The |NCS| provides a west command, ``ncs-provision``, allowing to upload keys to the device though the Serial Write Debug (SWD) interface.
 
@@ -38,6 +42,8 @@ See the following example for generating a private key:
    :class: highlight
 
    imgtool keygen -k my_ed25519_priv_key.pem -t ed25519
+
+.. _ug_nrf54l_developing_provision_kmu_provisioning:
 
 Provisioning keys to the board
 ******************************
@@ -106,7 +112,7 @@ Once you have an unprovisioned SoC, upload keys to the board by running one of t
       * It might utilize multiple keys, which is intended for use with key revocation.
         The number of keys is defined by the ``CONFIG_BOOT_SIGNATURE_KMU_SLOTS`` MCUboot's Kconfig option.
         You can enable the key revocation mechanism with the  ``CONFIG_BOOT_KEYS_REVOCATION`` MCUboot's Kconfig option.
-      * KMU support in its configuration needs to be enabled by setting the ``SB_CONFIG_MCUBOOT_SIGNATURE_USING_KMU`` sysbuild Kconfig option.
+      * KMU support in its configuration needs to be enabled by setting the :kconfig:option:`SB_CONFIG_MCUBOOT_SIGNATURE_USING_KMU` sysbuild Kconfig option.
         Otherwise, MCUboot will fallback to the compiled-in key.
 
       For NSIB, take note of the following:
@@ -125,20 +131,31 @@ Once you have an unprovisioned SoC, upload keys to the board by running one of t
 
    .. tab:: nRF Util
 
-      The nRF Util provisioning command requires a JSON file with the keys and the key metadata.
+      You can use the :ref:`generate_psa_key_attributes_script`, :ref:`similarly to nRF54H20<ug_nrf54h20_keys_generating>`, to generate the JSON file and the metadata from the PEM file you :ref:`generated earlier <ug_nrf54l_developing_provision_kmu_generate>`.
 
-      You can use the `generate_psa_key_attributes.py`_ script, :ref:`similarly to nRF54H20<ug_nrf54h20_keys_generating>`, to generate the JSON file and the metadata from the PEM file you :ref:`generated earlier <ug_nrf54l_developing_provision_kmu_generate>`.
-      For this purpose, invoke the script with the ``--key-from-file`` option to provide the PEM file and with the ``--file`` option to create a JSON file.
-      The file can contain multiple keys.
-      Calling the script multiple times and passing the same file to the `--file` argument will add all keys to the same JSON file.
+      .. include:: ../../../../../scripts/generate_psa_key_attributes/generate_psa_key_attributes.rst
+         :start-after: nrfutil_provision_keys_info_start
+         :end-before: nrfutil_provision_keys_info_end
 
-      To provision keys onto the KMU of the nRF54L15 SoC, use the following nRF Util command, with the ``<snr>`` being the serial number of the device and ``<key-file>`` being the name of the key file in the JSON format:
+      .. include:: ../../../../../scripts/generate_psa_key_attributes/generate_psa_key_attributes.rst
+         :start-after: nrfutil_provision_keys_command_start
+         :end-before: nrfutil_provision_keys_command_end
 
-      .. parsed-literal::
-        :class: highlight
+Alternative provisioning method
+*******************************
 
-         nrfutil device x-provision-keys --serial-number <snr> --key-file <JSON-key-file>
+To simplify the development process, keys can be generated and then provisioned at the same time as the flashing process.
+You can provision keys during flashing when the build directory contains the :file:`keyfile.json` file with commands, such as ``west flash --recover`` or ``west flash --erase``.
+When flashing a project that contains NSIB, you can only use the ``west flash --recover``, as the programming file contains UICR provisioning data as well.
 
-      You can call this command multiple times also to provision multiple keys, as long as each key has a different ID that is part of the metadata string.
+You can generate the :file:`keyfile.json` file during the build process (for example, when running ``west build``) if the :Kconfig:option:`SB_CONFIG_SECURE_BOOT_GENERATE_DEFAULT_KMU_KEYFILE` or :Kconfig:option:`SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE` Kconfig options are enabled.
+These options enable, respectively, the NSIB and the MCUboot keys, included in the generated :file:`keyfile.json` file.
+This file contains the necessary key provisioning information.
 
-      For more information about this command, see the `Provisioning keys for hardware KMU`_ page in the nRF Util documentation.
+If you set the :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE` Kconfig option to a PEM key file, that specific file will be used.
+If not, the build will use the default key named :file:`GENERATED_NON_SECURE_SIGN_KEY_PRIVATE.pem`, which is located in the build directory.
+Similarly, MCUboot uses the key file designated by the :Kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` option.
+
+At the end of the described process, the :file:`keyfile.json` file is generated in the build directory.
+This file allows key provisioning to occur simultaneously with the flashing process.
+Alternatively, you can bypass the mentioned Kconfig options and manually place a custom :file:`keyfile.json` in the build directory.

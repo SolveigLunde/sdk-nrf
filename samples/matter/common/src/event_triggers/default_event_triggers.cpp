@@ -171,15 +171,14 @@ CHIP_ERROR DiagnosticLogsUserDataCallback(TestEventTrigger::TriggerValue bytesNu
 		return CHIP_ERROR_NO_MEMORY;
 	}
 
-	ChipLogProgress(Zcl, "Storing %zu User logs", logSize);
 	if (logSize == 0) {
-		DiagnosticLogProvider::GetInstance().ClearTestingBuffer(
+		ChipLogProgress(Zcl, "Clearing User logs");
+		DiagnosticLogProvider::GetInstance().ClearLogs(
 			chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport);
 	} else {
-		VerifyOrReturnError(DiagnosticLogProvider::GetInstance().StoreTestingLog(
-					    chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport,
-					    sTempLogBuffer, logSize),
-				    CHIP_ERROR_NO_MEMORY);
+		ChipLogProgress(Zcl, "Storing %zu User logs", logSize);
+		ReturnErrorOnFailure(DiagnosticLogProvider::GetInstance().PushLog(
+			chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport, sTempLogBuffer, logSize));
 	}
 
 	return CHIP_NO_ERROR;
@@ -195,16 +194,14 @@ CHIP_ERROR DiagnosticLogsNetworkDataCallback(TestEventTrigger::TriggerValue byte
 		return CHIP_ERROR_NO_MEMORY;
 	}
 
-	ChipLogProgress(Zcl, "Storing %zu Network logs", logSize);
-
 	if (logSize == 0) {
-		DiagnosticLogProvider::GetInstance().ClearTestingBuffer(
+		ChipLogProgress(Zcl, "Clearing Network logs");
+		DiagnosticLogProvider::GetInstance().ClearLogs(
 			chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag);
 	} else {
-		VerifyOrReturnError(DiagnosticLogProvider::GetInstance().StoreTestingLog(
-					    chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag,
-					    sTempLogBuffer, logSize),
-				    CHIP_ERROR_NO_MEMORY);
+		ChipLogProgress(Zcl, "Storing %zu Network logs", logSize);
+		ReturnErrorOnFailure(DiagnosticLogProvider::GetInstance().PushLog(
+			chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag, sTempLogBuffer, logSize));
 	}
 
 	return CHIP_NO_ERROR;
@@ -264,6 +261,11 @@ CHIP_ERROR Register()
 		Ids::DiagnosticLogsCrash, TestEventTrigger::EventTrigger{ 0, DiagnosticLogsCrashCallback }));
 #endif /* CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS_CRASH_LOGS */
 #endif /* CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS_TEST */
+
+#ifdef CONFIG_CHIP_ENABLE_ICD_SUPPORT
+	/* Register ICD test event triggers */
+	ReturnErrorOnFailure(Nrf::Matter::TestEventTrigger::Instance().RegisterICDTestEventTriggers());
+#endif
 
 	/* Register OTA test events handler */
 	static chip::OTATestEventTriggerHandler otaTestEventTrigger;

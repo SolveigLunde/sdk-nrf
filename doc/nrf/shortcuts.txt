@@ -2,11 +2,14 @@
 
 .. ### Versions
 
-.. |release| replace:: v3.0.0
-.. |release_tt| replace:: ``v3.0.0``
-.. |release_number_tt| replace:: ``3.0.0``
+.. |release| replace:: v3.1.0
+.. |release_tt| replace:: ``v3.1.0``
+.. |release_number_tt| replace:: ``3.1.0``
 
-.. |jlink_ver| replace:: v8.42
+.. |jlink_ver| replace:: v8.60
+
+.. |54H_nrfutil_device_ver| replace:: 2.13.1
+.. |54H_nrfutil_trace_ver| replace:: 4.0.1
 
 .. ### Config shortcuts
 
@@ -81,14 +84,12 @@
 .. |fota_upgrades_def| replace:: You can update the firmware of the device over the air, thus without a wired connection.
    Such an update is called a FOTA (firmware over-the-air) update.
 
-.. |fota_upgrades_building| replace:: To create a binary file for an application update, build the application with the :kconfig:option:`CONFIG_BOOTLOADER_MCUBOOT` option enabled.
-
 .. ### VSC shortcuts
 
-.. |vsc_extension_description| replace:: The |nRFVSC| is a complete IDE for developing applications compatible with the |NCS|.
-   The extension includes an interface for managing SDK and toolchain installations, an interface to the compiler and linker, an RTOS-aware debugger, a seamless interface to the |NCS|, and a serial terminal.
+.. |vsc_extension_description| replace:: |nRFVSC| is a set of VSIX extensions that turns |VSC| into a complete IDE for developing applications compatible with the |NCS|.
+   The extensions that are part of |nRFVSC| provide an interface for managing SDK and toolchain installations, an interface to the compiler and linker, an RTOS-aware debugger, a seamless interface to the |NCS|, and a serial terminal.
 .. |VSC| replace:: Visual Studio Code
-.. |nRFVSC| replace:: nRF Connect for VS Code extension
+.. |nRFVSC| replace:: nRF Connect for VS Code
 
 .. ### Deprecation shortcuts
 
@@ -180,7 +181,8 @@
 .. ### Other shortcuts
 
 .. |ncs_oot_sample_note| replace:: Some samples in the |NCS| are currently not designed to work out-of-tree.
-   You may need to manually configure your sample to work correctly in the |nRFVSC|.
+   You may need to manually configure your sample to work correctly in |nRFVSC|.
+
 .. |ncs_repo| replace:: https://github.com/nrfconnect/sdk-nrf
 
 .. |ncs_nrfxlib_repo| replace:: https://github.com/nrfconnect/sdk-nrfxlib
@@ -211,7 +213,7 @@
    The suggested approach is to test with Nordic Semiconductor devices on both sides first to verify basic functionalities and get familiar with the solution before using custom devices.
    Contact `Technical Support team <DevZone_>`_ if you need assistance.
 
-.. |usb_known_issues| replace:: Make sure to check the :ref:`nRF5340 Audio application known issues <known_issues_nrf5340audio>` related to serial connection with the USB.
+.. |usb_known_issues| replace:: Make sure to check the :ref:`nRF5340 Audio application known issue OCT-2154 <known_issues_nrf5340audio>` related to intermittent audio stream on the headset when using USB audio interface on macOS.
 
 .. |trusted_execution| replace:: nRF5340 and nRF9160
 
@@ -258,8 +260,6 @@
 
 .. |filter_samples_by_board| replace:: If you want to list samples available for one or more specific boards, `use the nRF Connect for Visual Studio Code extension to filter them <Browse samples_>`_.
 
-.. |54H_engb_2_8| replace:: The nRF54H20 DK Engineering A and B (up to version 0.8.2) are no longer supported starting with |NCS| v2.9.0.
-
 .. |devicetree_bindings| replace:: The devicetree bindings provide the structure for the content of the devicetree nodes.
    The :ref:`compatible <zephyr:dt-bindings-compatible>` property defines the compatibility of a devicetree node with a devicetree binding.
    For more information, read the :ref:`documentation about devicetree bindings in Zephyr <zephyr:dt-binding-compat>`.
@@ -271,3 +271,10 @@
 .. |original_mbedtls_def_note| replace:: Whenever this documentation mentions 'original' Mbed TLS, it refers to the open-source `Arm Mbed TLS project`_, not the customized version available in Zephyr.
    There is an option to utilize a 'built-in' driver, which corresponds to the software-implemented cryptography from the 'original' Mbed TLS deliverables.
    This is provided to ensure that the cryptographic toolbox supports all requested features.
+
+
+.. |matter_cluster_editor_preview| replace:: The Matter Cluster Editor app is currently in the preview stage.
+
+.. |ISE| replace:: IronSide SE
+
+.. |ESB| replace:: Enhanced ShockBurst

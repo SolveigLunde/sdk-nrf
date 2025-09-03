@@ -62,6 +62,15 @@ The following is an example of the CLI command:
 
 .. tabs::
 
+   .. group-tab:: nRF9151 DK
+
+      To build for the nRF9151 DK, use the ``nrf9151dk/nrf9151/ns`` board target with the ``SHIELD`` CMake option set to ``nrf7002ek`` and a scan-only overlay configuration.
+      The following is an example of the CLI command:
+
+      .. code-block:: console
+
+         west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
+
    .. group-tab:: nRF9161 DK
 
       To build for the nRF9161 DK, use the ``nrf9161dk/nrf9161/ns`` board target with the ``SHIELD`` CMake option set to ``nrf7002ek`` and a scan-only overlay configuration.
@@ -69,7 +78,7 @@ The following is an example of the CLI command:
 
       .. code-block:: console
 
-         west build -p -b nrf9161dk/nrf9161/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek
+         west build -p -b nrf9161dk/nrf9161/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
 
    .. group-tab:: nRF9160 DK
 
@@ -78,13 +87,13 @@ The following is an example of the CLI command:
 
     .. code-block:: console
 
-       west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek
+       west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
 
 .. note::
    The nRF91 Series supports Wi-Fi through nR70 Series shields but is limited to scan-only operation to enhance location accuracy.
    However, it does not support full Wi-Fi operations.
 
-To build for the Thingy:91 X using the nRF5340 as the host chip, use the ``thingy91x/nrf5340/cpuapp`` board target with the ``SB_CONFIG_THINGY91X_STATIC_PARTITIONS_NRF53_EXTERNAL_FLASH=y`` CMake option set.
+To build for the Thingy:91 X using the nRF5340 as the host chip, use the ``thingy91x/nrf5340/cpuapp`` board target with the :kconfig:option:`SB_CONFIG_THINGY91X_STATIC_PARTITIONS_NRF53_EXTERNAL_FLASH` Kconfig option set to ``y``.
 This requires an external debugger since the nRF9151 normally owns the buses.
 This special configuration is not compatible with nRF9151 firmware compiled for the default configuration.
 You need to erase the nRF9151 first to avoid conflicts.

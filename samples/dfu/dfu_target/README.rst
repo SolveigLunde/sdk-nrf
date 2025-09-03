@@ -1,7 +1,7 @@
 .. _dfu_target_sample:
 
-DFU Target Sample
-#################
+DFU Target
+##########
 
 .. contents::
    :local:
@@ -13,7 +13,7 @@ Currently, it only supports DFU targets for MCUboot.
 Requirements
 ************
 
-The sample supports the following development kits:
+The sample supports the following development kit:
 
 .. table-from-sample-yaml::
 
@@ -136,4 +136,4 @@ Dependencies
 This sample uses the following |NCS| libraries:
 
 * :ref:`lib_dfu_target`
-* MCUBOOT
+* :ref:`MCUboot <mcuboot_index_ncs>`

@@ -32,7 +32,7 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for the ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, ``nrf54l15dk/nrf54l15/cpuapp``, and ``nrf54l15dk/nrf54l10/cpuapp`` board targets.
+* Matter over Thread is supported for the ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, ``nrf54l15dk/nrf54l15/cpuapp``, ``nrf54l15dk/nrf54l10/cpuapp`` and ``nrf54lm20dk/nrf54lm20a/cpuapp`` board targets.
 * Matter over Wi-Fi is supported for the ``nrf5340dk/nrf5340/cpuapp`` board target with the ``nrf7002ek`` shield attached, or for the ``nrf7002dk/nrf5340/cpuapp`` board target.
 
 Overview
@@ -133,7 +133,7 @@ For example:
 Matter template using only internal memory
 ==========================================
 
-For the nRF54L15 DK, you can configure the sample to use only the internal RRAM for storage.
+For the nRF54L15 DK and nRF54LM20 DK, you can configure the sample to use only the internal RRAM for storage.
 It applies to the DFU as well, which means that both the currently running firmware and the new firmware to be updated will be stored within the device's internal RRAM memory.
 See the Device Firmware Upgrade support section above for information about the DFU process.
 
@@ -193,6 +193,16 @@ Building and running
 .. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
 
 .. include:: /includes/ipc_radio_conf.txt
+
+Building the Matter over Wi-Fi sample variant on nRF5340 DK with nRF7002 EK shield
+==================================================================================
+
+.. include:: /includes/matter_building_nrf5340dk_70ek
+
+Flashing the Matter over Wi-Fi sample variant
+=============================================
+
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a configuration
 =========================

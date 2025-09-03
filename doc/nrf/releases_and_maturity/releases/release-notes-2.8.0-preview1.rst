@@ -55,24 +55,24 @@ Build and configuration system
 
 * Added:
 
-  * The ``SB_CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM`` sysbuild Kconfig option to system that allows utilizing all available RAM when using TF-M on an nRF5340 device.
+  * The :kconfig:option:`SB_CONFIG_MCUBOOT_USE_ALL_AVAILABLE_RAM` sysbuild Kconfig option to system that allows utilizing all available RAM when using TF-M on an nRF5340 device.
 
     .. note::
        This has security implications and may allow secrets to be leaked to the non-secure application in RAM.
 
-  * The ``SB_CONFIG_MCUBOOT_NRF53_MULTI_IMAGE_UPDATE`` sysbuild Kconfig option that enables updating the network core on the nRF5340 SoC from external flash.
+  * The :kconfig:option:`SB_CONFIG_MCUBOOT_NRF53_MULTI_IMAGE_UPDATE` sysbuild Kconfig option that enables updating the network core on the nRF5340 SoC from external flash.
   * The AP-Protect sysbuild Kconfig options to enable the corresponding AP-Protect Kconfig options for all images in the build:
 
-    * ``SB_CONFIG_APPROTECT_LOCK`` for the :kconfig:option:`CONFIG_NRF_APPROTECT_LOCK` Kconfig option.
-    * ``SB_CONFIG_APPROTECT_USER_HANDLING`` for the :kconfig:option:`CONFIG_NRF_APPROTECT_USER_HANDLING` Kconfig option.
-    * ``SB_CONFIG_APPROTECT_USE_UICR`` for the :kconfig:option:`CONFIG_NRF_APPROTECT_USE_UICR` Kconfig option.
-    * ``SB_CONFIG_SECURE_APPROTECT_LOCK`` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_LOCK` Kconfig option.
-    * ``SB_CONFIG_SECURE_APPROTECT_USER_HANDLING`` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_USER_HANDLING` Kconfig option.
-    * ``SB_CONFIG_SECURE_APPROTECT_USE_UICR`` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_USE_UICR` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_APPROTECT_LOCK` for the :kconfig:option:`CONFIG_NRF_APPROTECT_LOCK` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_APPROTECT_USER_HANDLING` for the :kconfig:option:`CONFIG_NRF_APPROTECT_USER_HANDLING` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_APPROTECT_USE_UICR` for the :kconfig:option:`CONFIG_NRF_APPROTECT_USE_UICR` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_SECURE_APPROTECT_LOCK` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_LOCK` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_SECURE_APPROTECT_USER_HANDLING` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_USER_HANDLING` Kconfig option.
+    * :kconfig:option:`SB_CONFIG_SECURE_APPROTECT_USE_UICR` for the :kconfig:option:`CONFIG_NRF_SECURE_APPROTECT_USE_UICR` Kconfig option.
 
-* Added the ``SB_CONFIG_LWM2M_CARRIER_DIVIDED_DFU`` sysbuild Kconfig option that enables the generation of proprietary application update files required for the LwM2M carrier divided FOTA procedure.
+* Added the :kconfig:option:`SB_CONFIG_LWM2M_CARRIER_DIVIDED_DFU` sysbuild Kconfig option that enables the generation of proprietary application update files required for the LwM2M carrier divided FOTA procedure.
 
-* Removed the non-working support for configuring the NSIB signing key through the environmental or command line variable (``SB_SIGNING_KEY_FILE``) along with child image.
+* Removed the non-working support for configuring the NSIB signing key through the environmental or command line variable (:kconfig:option:`SB_SIGNING_KEY_FILE`) along with child image.
 
   .. note::
      This feature has never been functional.
@@ -90,7 +90,7 @@ Build and configuration system
   It is recommended to replace them with the new devicetree property: ``nordic,access``.
   See the :ref:`migration guide <migration_2.8_recommended>` for more information.
 
-* Removed the non-working support for configuring the NSIB signing key through the environmental or command line variable (``SB_SIGNING_KEY_FILE``) along with child image.
+* Removed the non-working support for configuring the NSIB signing key through the environmental or command line variable (:kconfig:option:`SB_SIGNING_KEY_FILE`) along with child image.
 
   .. note::
      This feature has never been functional.
@@ -392,7 +392,7 @@ Serial LTE modem
 * Added:
 
   * DTLS support for the ``#XUDPSVR`` and ``#XSSOCKET`` (UDP server sockets) AT commands when the :file:`overlay-native_tls.conf` configuration file is used.
-  * The :kconfig:option:`CONFIG_SLM_PPP_FALLBACK_MTU` Kconfig option that is used to control the MTU used by PPP when the cellular link MTU is not returned by the modem in response to the ``AT+CGCONTRDP=0`` AT command.
+  * The :ref:`CONFIG_SLM_PPP_FALLBACK_MTU <CONFIG_SLM_PPP_FALLBACK_MTU>` Kconfig option that is used to control the MTU used by PPP when the cellular link MTU is not returned by the modem in response to the ``AT+CGCONTRDP=0`` AT command.
   * Handler for new nRF Cloud event type ``NRF_CLOUD_EVT_RX_DATA_DISCON``.
   * Support for socket option ``AT_SO_IPV6_DELAYED_ADDR_REFRESH``.
 
@@ -492,7 +492,7 @@ Bluetooth Fast Pair samples
 
     * LED indication on development kits for the Fast Pair advertising state.
     * An application versioning using the :file:`VERSION` file.
-    * The DFU support which can be enabled using the ``SB_CONFIG_APP_DFU`` sysbuild Kconfig option.
+    * The DFU support which can be enabled using the :kconfig:option:`SB_CONFIG_APP_DFU` sysbuild Kconfig option.
       DFU is available for all supported targets except the ``debug`` configurations of :zephyr:board:`nrf52dk` and :zephyr:board:`nrf52833dk` due to size constraints.
 
   * Updated:
@@ -539,12 +539,12 @@ Cellular samples
 
   * Added:
 
-    * The :kconfig:option:`CONFIG_TEST_COUNTER_MULTIPLIER` Kconfig option to multiply the number of test counter messages sent, for testing purposes.
+    * The :ref:`CONFIG_TEST_COUNTER_MULTIPLIER <CONFIG_TEST_COUNTER_MULTIPLIER>` Kconfig option to multiply the number of test counter messages sent, for testing purposes.
     * A handler for new nRF Cloud event type ``NRF_CLOUD_EVT_RX_DATA_DISCON`` to stop sensors and location services.
     * Board support files to enable Wi-Fi scanning for the Thingy:91 X.
-    * The :kconfig:option:`CONFIG_SEND_ONLINE_ALERT` Kconfig option to enable calling the :c:func:`nrf_cloud_alert` function on startup.
+    * The :ref:`CONFIG_SEND_ONLINE_ALERT <CONFIG_SEND_ONLINE_ALERT>` Kconfig option to enable calling the :c:func:`nrf_cloud_alert` function on startup.
     * Logging of the `reset reason code <nRF9160 RESETREAS_>`_.
-    * The :kconfig:option:`CONFIG_POST_PROVISIONING_INTERVAL_M` Kconfig option to reduce the provisioning connection interval once the device successfully connects.
+    * The :ref:`CONFIG_POST_PROVISIONING_INTERVAL_M <CONFIG_POST_PROVISIONING_INTERVAL_M>` Kconfig option to reduce the provisioning connection interval once the device successfully connects.
 
   * Updated:
 
@@ -564,7 +564,7 @@ Cellular samples
   * Added:
 
     * Support for dictionary logs using REST.
-    * The :kconfig:option:`CONFIG_SEND_ONLINE_ALERT` Kconfig option to enable calling the :c:func:`nrf_cloud_alert` function on startup.
+    * The :ref:`CONFIG_SEND_ONLINE_ALERT <CONFIG_SEND_ONLINE_ALERT>` Kconfig option to enable calling the :c:func:`nrf_cloud_alert` function on startup.
     * Logging of the `reset reason code <nRF9160 RESETREAS_>`_.
 
   * Updated:
@@ -688,7 +688,7 @@ PMIC samples
 
 * Added support for the :zephyr:board:`nrf54l15dk` and :zephyr:board:`nrf54h20dk` to the PMIC samples.
 
-* :ref:`npm1300_fuel_gauge` sample:
+* :ref:`nPM1300: Fuel gauge <npm13xx_fuel_gauge>` sample:
 
   * Updated to accommodate API changes in nRF Fuel Gauge library v0.11.1.
 

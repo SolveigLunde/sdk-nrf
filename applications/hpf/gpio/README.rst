@@ -4,6 +4,10 @@
 High-Performance Framework GPIO
 ###############################
 
+.. contents::
+   :local:
+   :depth: 2
+
 .. caution::
 
    The High-Performance Framework (HPF) support in the |NCS| is :ref:`experimental <software_maturity>` and is limited to the nRF54L15 device.
@@ -36,9 +40,9 @@ Configuration
 
 You can enable the following IPC backends:
 
-* mbox (``SB_CONFIG_HPF_GPIO_BACKEND_MBOX``)
-* icmsg (``SB_CONFIG_HPF_GPIO_BACKEND_ICMSG``)
-* icbmsg (``SB_CONFIG_HPF_GPIO_BACKEND_ICBMSG``)
+* mbox (:kconfig:option:`SB_CONFIG_HPF_GPIO_BACKEND_MBOX`)
+* icmsg (:kconfig:option:`SB_CONFIG_HPF_GPIO_BACKEND_ICMSG`)
+* icbmsg (:kconfig:option:`SB_CONFIG_HPF_GPIO_BACKEND_ICBMSG`)
 
 Building and running
 ********************

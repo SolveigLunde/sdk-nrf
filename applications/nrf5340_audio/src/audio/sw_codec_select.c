@@ -19,6 +19,9 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(sw_codec_select, CONFIG_SW_CODEC_SELECT_LOG_LEVEL);
 
+/* Used for debugging, inserts 0 instead of packet loss concealment */
+#define SW_CODEC_OVERRIDE_PLC false
+
 static struct sw_codec_config m_config;
 
 static struct sample_rate_converter_ctx encoder_converters[CONFIG_AUDIO_ENCODE_CHANNELS_MAX];
@@ -222,7 +225,7 @@ int sw_codec_decode(struct net_buf const *const audio_frame, void **decoded_data
 
 		switch (m_config.decoder.channel_mode) {
 		case SW_CODEC_MONO: {
-			if (meta->bad_data && IS_ENABLED(CONFIG_SW_CODEC_OVERRIDE_PLC)) {
+			if (meta->bad_data && SW_CODEC_OVERRIDE_PLC) {
 				memset(decoded_data_mono[0], 0, PCM_NUM_BYTES_MONO);
 				decoded_data_size = PCM_NUM_BYTES_MONO;
 			} else {
@@ -247,21 +250,36 @@ int sw_codec_decode(struct net_buf const *const audio_frame, void **decoded_data
 				}
 			}
 
-			/* For now, i2s is only stereo, so in order to send
-			 * just one channel, we need to insert 0 for the
-			 * other channel
-			 */
-			ret = pscm_zero_pad(pcm_in_data_ptrs[0], pcm_size_mono,
-					    m_config.decoder.audio_ch, CONFIG_AUDIO_BIT_DEPTH_BITS,
-					    pcm_data_stereo, &pcm_size_stereo);
-			if (ret) {
-				return ret;
+			if (IS_ENABLED(CONFIG_STREAM_BIDIRECTIONAL) &&
+			    (CONFIG_AUDIO_DEV == GATEWAY)) {
+				/* If we are receieving mono audio on the gateway, we send it out
+				 * as stereo, so we need to pad the mono data to stereo.
+				 */
+				ret = pscm_copy_pad(pcm_in_data_ptrs[0], pcm_size_mono,
+						    CONFIG_AUDIO_BIT_DEPTH_BITS, pcm_data_stereo,
+						    &pcm_size_stereo);
+				if (ret) {
+					LOG_ERR("Failed to copy pad mono to stereo: %d", ret);
+					return ret;
+				}
+			} else {
+				/* For now, i2s is only stereo, so in order to send
+				 * just one channel, we need to insert 0 for the
+				 * other channel
+				 */
+				ret = pscm_zero_pad(pcm_in_data_ptrs[0], pcm_size_mono,
+						    m_config.decoder.audio_ch,
+						    CONFIG_AUDIO_BIT_DEPTH_BITS, pcm_data_stereo,
+						    &pcm_size_stereo);
+				if (ret) {
+					return ret;
+				}
 			}
 			break;
 		}
 		case SW_CODEC_STEREO: {
 
-			if (meta->bad_data && IS_ENABLED(CONFIG_SW_CODEC_OVERRIDE_PLC)) {
+			if (meta->bad_data && SW_CODEC_OVERRIDE_PLC) {
 				memset(decoded_data_mono[0], 0, PCM_NUM_BYTES_MONO);
 				memset(decoded_data_mono[1], 0, PCM_NUM_BYTES_MONO);
 				decoded_data_size = PCM_NUM_BYTES_MONO;

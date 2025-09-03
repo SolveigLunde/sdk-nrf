@@ -286,15 +286,17 @@ Nordic Semiconductor provides the following certification identifiers:
 
 You can visit the following pages to check the Bluetooth QDIDs and Thread CIDs valid for SoCs that support Matter applications:
 
-* `nRF52840 Compatibility Matrix <nRF52840 DK Compatibility Matrix_>`_
-* `nRF5340 Compatibility Matrix <nRF5340 DK Compatibility Matrix_>`_
-* `nRF54L15 Compatibility Matrix <nRF54L15 DK Compatibility Matrix_>`_
+* `nRF52840 Compatibility Matrix <nRF52840 Compatibility Matrix_>`_
+* `nRF5340 Compatibility Matrix <nRF5340 Compatibility Matrix_>`_
+* `nRF54L15 Compatibility Matrix <nRF54L15 SoC Compatibility Matrix_>`_
 
 Matter certification process variants
 *************************************
 
 The standard Matter certification process has several variants that you can use if you have already obtained the certification or you want to certify several products of the same family.
 There are separate processes for certification for different devices and recertification for devices that are already certified.
+
+.. _ug_matter_device_recertification_process:
 
 Matter recertification process variants
 =======================================
@@ -338,6 +340,8 @@ The first certification must still be done at an ATL.
    :alt: Matter's Rapid Recertification program overview
 
    Matter's Rapid Recertification program overview
+
+.. _ug_matter_device_portfolio_certification:
 
 Matter portfolio certification process variants
 ===============================================

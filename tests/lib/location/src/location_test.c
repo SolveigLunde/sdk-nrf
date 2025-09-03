@@ -54,7 +54,7 @@ void __cmock_net_mgmt_NET_REQUEST_WIFI_SCAN_ExpectAndReturn(int retval)
 }
 
 int net_mgmt_NET_REQUEST_WIFI_SCAN(
-	uint32_t mgmt_request,
+	uint64_t mgmt_request,
 	struct net_if *iface,
 	void *data,
 	size_t len)
@@ -164,7 +164,7 @@ extern void method_gnss_event_handler(int event);
  */
 extern void scan_wifi_net_mgmt_event_handler(
 	struct net_mgmt_event_callback *cb,
-	uint32_t mgmt_event,
+	uint64_t mgmt_event,
 	struct net_if *iface);
 
 static void helper_location_data_clear(void)
@@ -692,7 +692,7 @@ void test_location_gnss_agnss_no_request(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -884,7 +884,7 @@ void test_location_gnss(void)
 #endif
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -985,7 +985,7 @@ void test_location_gnss_location_request_timeout(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -1578,7 +1578,7 @@ void test_location_request_default(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -1801,7 +1801,7 @@ void test_location_request_mode_all_cellular_gnss(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -1902,7 +1902,7 @@ void test_location_request_mode_all_cellular_error_gnss_timeout(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -2000,7 +2000,7 @@ void test_location_gnss_periodic(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */
@@ -2061,7 +2061,7 @@ void test_location_gnss_periodic(void)
 	__cmock_nrf_modem_gnss_start_ExpectAndReturn(0);
 
 	__mock_nrf_modem_at_scanf_ExpectAndReturn(
-		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d", 4);
+		"AT%XSYSTEMMODE?", "%%XSYSTEMMODE: %d,%d,%d,%d,%d", 4);
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* LTE-M support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* NB-IoT support */
 	__mock_nrf_modem_at_scanf_ReturnVarg_int(1); /* GNSS support */

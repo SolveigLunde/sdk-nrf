@@ -5,16 +5,22 @@
 #
 
 config CRACEN_HW_PRESENT
-	def_bool SOC_SERIES_NRF54LX || SOC_SERIES_NRF92X
+	def_bool SOC_SERIES_NRF54LX || SOC_SERIES_NRF92X || SOC_SERIES_NRF71X
 
 config CRACEN_HW_VERSION_BASE
 	def_bool SOC_SERIES_NRF54HX || SOC_NRF54L15 || SOC_NRF54L10 || SOC_NRF54L05
 
 config CRACEN_HW_VERSION_LITE
-	def_bool SOC_NRF54LM20A || SOC_NRF54LV10A
+	def_bool SOC_NRF54LM20A || SOC_NRF54LV10A || SOC_NRF7120_ENGA
 
-config CRACEN_USE_MULTIPART_WORKAROUNDS
+config CRACEN_KMU_HW_PRESENT
+	def_bool SOC_SERIES_NRF54LX || SOC_SERIES_NRF71X
+
+config CRACEN_NEED_MULTIPART_WORKAROUNDS
 	def_bool SOC_NRF54LM20A
+
+config CRACEN_NEED_IKG_INTERRUPT_WORKAROUND
+	def_bool SOC_NRF54LM20A || SOC_NRF54LV10A || SOC_NRF7120_ENGA
 
 # Configure CRACEN_LOG_LEVEL
 module = CRACEN
@@ -34,15 +40,26 @@ config CRACEN_LOAD_MICROCODE
 
 config CRACEN_LIB_KMU
 	bool "CRACEN KMU library"
-	depends on SOC_SERIES_NRF54LX
-	select NRFX_RRAMC if !BUILD_WITH_TFM
+	depends on CRACEN_KMU_HW_PRESENT
+	select NRFX_RRAMC if !BUILD_WITH_TFM && SOC_SERIES_NRF54LX
+	select NRFX_MRAMC if !BUILD_WITH_TFM && SOC_SERIES_NRF71X
 	default y
 	help
 	  The CRACEN KMU library.
 
-config CRACEN_IKG
-	bool "Enable CRACEN IKG"
+config CRACEN_PROVISION_PROT_RAM_INV_DATA
+	bool "Provision protected RAM invalidation data"
+	depends on CRACEN_LIB_KMU
 	default y
+	help
+	  Provision the protected RAM invalidation data in the KMU. This will generate random
+	  data and provision the reserved KMU slots with the data that will be used to invalidate
+	  the protected RAM after a key is used.
+	  When disabled the application is expected to provision the reserved KMU slots 248 and 249
+	  manually, otherwise the protected RAM keys will not be usable.
+
+config CRACEN_IKG
+	bool "CRACEN IKG"
 	help
 	  Enable the Cracen Isolated Key Generator.
 
@@ -65,6 +82,13 @@ config CRACEN_IKG_SEED_KMU_SLOT
 	  the one defined here and the two subsequent ones.
 	  This defines the KMU slot (along with the two following it) to which
 	  the IKG seed is provisioned and that is pushed when loading the IKG seed.
+
+config CRACEN_IKG_PERSONALIZED_KEYS
+	bool "CRACEN IKG personalized keys"
+	help
+	  Personalize each IKG-generated key for the associated key owner.
+	  If an owner ID is encoded into the mbedtls_svc_key_id_t type,
+	  it will be passed to the IKG as a personalization string.
 
 config CRACEN_USE_INTERRUPTS
 	bool "Use cracen with interrupts"

@@ -39,5 +39,10 @@ Zephyr and the |NCS| provide support and contain board definitions for developin
    ug_nrf54h20_logging
    ug_nrf54h20_debugging
    ug_nrf54h20_custom_pcb
+   ug_nrf54h20_ironside
    ug_nrf54h20_flpr
+   ug_nrf54h20_ppr
    ../nrf54l/zms.rst
+   ug_nrf54h20_mcuboot_dfu
+   ug_nrf54h_ecies_x25519
+   ug_nrf54h20_pm_optimization

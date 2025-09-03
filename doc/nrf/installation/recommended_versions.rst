@@ -327,7 +327,7 @@ For firmware OS support, see :ref:`the table at the top of the page <supported_O
     - x64
     - ARM64
   * - `Windows 11`_
-    - Tier 3
+    - n/a
     - Tier 3
     - Not supported
   * - `Windows 10`_
@@ -346,6 +346,10 @@ For firmware OS support, see :ref:`the table at the top of the page <supported_O
     - Not supported
     - Not supported
     - Not supported
+  * - `macOS 26`_
+    - n/a
+    - Tier 3
+    - Tier 3
   * - `macOS 15`_
     - n/a
     - Tier 3
@@ -388,14 +392,27 @@ nRF Connect for Visual Studio Code
 
 |vsc_extension_description|
 
-In addition, the |nRFVSC| provides the following configuration tools for the :ref:`build system components <configuration_system_overview>`:
+In addition, |nRFVSC| provides the following configuration tools for the :ref:`build system components <configuration_system_overview>`:
 
 * For CMake, the `build configuration management <How to work with build configurations_>`_.
 * For Devicetree, the `Devicetree Visual Editor <How to work with Devicetree Visual Editor_>`_.
 * For Kconfig, the `Kconfig GUI <Configuring with nRF Kconfig_>`_.
+* For Zephyr's :ref:`zephyr:optimization_tools`, the interactive `Memory report`_ feature.
 
-The extension follows its own `release cycle <latest release notes for nRF Connect for Visual Studio Code_>`_.
+The extensions that make up |nRFVSC| are nRF Connect for VS Code, nRF Kconfig, nRF DeviceTree, and nRF Terminal.
+While you can install each extension separately, some of them will not work without others and you need all four to use all of the features.
+
+The extensions follow their own `release cycle <latest release notes for nRF Connect for Visual Studio Code_>`_.
 Use the latest available release for development.
+
+The extensions are available for download from the following websites:
+
+* |VSC| Marketplace, where the extensions are bundled as the `nRF Connect for VS Code Extension Pack`_.
+* `Open VSX Registry`_, from where you can install the extensions separately to editors based on |VSC| and compatible with the VSIX format.
+
+  .. note::
+     Nordic Semiconductor does not test editors other than |VSC| for compatibility with |nRFVSC|.
+     While you are encouraged to report any issues you encounter on `DevZone`_, issues discovered in editors other than |VSC| and not reproducible in |VSC| will not be prioritized.
 
 See the :ref:`install_ncs` page for information about how to use the extension to manage |NCS| toolchain installations.
 For more information about the extension and what it offers, visit the `nRF Connect for Visual Studio Code`_ documentation.
@@ -409,7 +426,9 @@ The `nRF Util development tool`_ is a unified command line utility for Nordic pr
 Its functionality is provided through installable and upgradeable commands that are served on a central package registry on the Internet.
 
 The utility follows its own release cycle and has its own `operating system requirements <nRF Util_>`_.
+
 The |NCS| toolchain bundle includes the nRF Util version :ncs-tool-version:`NRFUTIL_VERSION_WIN10` and the device command version :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_WIN10`, as listed in :ref:`requirements_toolchain_tools`.
+When you :ref:`gs_installing_toolchain`, you get both these versions `locked <Locking nRF Util home directory_>`_ to prevent unwanted changes to the toolchain bundle.
 
 .. note::
 
