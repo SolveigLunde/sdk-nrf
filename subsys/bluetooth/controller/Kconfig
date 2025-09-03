@@ -536,9 +536,11 @@ config BT_CTLR_SDC_CIS_SUBEVENT_LENGTH_US
 
 config BT_CTLR_EXTENDED_FEAT_SET
 	select EXPERIMENTAL
+	
 
 config BT_CTLR_FRAME_SPACE_UPDATE
 	select EXPERIMENTAL
+
 
 config BT_CTLR_CHANNEL_SOUNDING
 	bool "Channel Sounding support"
