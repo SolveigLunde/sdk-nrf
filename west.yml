@@ -65,7 +65,7 @@ manifest:
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
     - name: zephyr
       repo-path: sdk-zephyr
-      revision: 1d73d0e3cb5ff37fd53c103bb49c1e9b92be75c5
+      revision: b2b59e08ca03fe41222a3c3a6cad6fe11529b9c2
       import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
@@ -128,7 +128,7 @@ manifest:
           compare-by-default: true
     - name: mcuboot
       repo-path: sdk-mcuboot
-      revision: e1f2ab3806ce7ebc7ef34b3fc04272e747590745
+      revision: 391f093019ebcf74bf460b1be4120f2816fa9eb9
       path: bootloader/mcuboot
     - name: qcbor
       url: https://github.com/laurencelundblade/QCBOR
@@ -145,15 +145,15 @@ manifest:
     - name: nrfxlib
       repo-path: sdk-nrfxlib
       path: nrfxlib
-      revision: f0afc237a8e7324c71b75b233aaf49ea0aee3b41
+      revision: b492d688f201ecd7880e0898e1b166cd02cc266a
     - name: trusted-firmware-m
       repo-path: sdk-trusted-firmware-m
       path: modules/tee/tf-m/trusted-firmware-m
-      revision: 44bbc980ed6bcc7583d5bf532991f804d8ef0ea6
+      revision: 97e79ea61a6572ed56cdd33396ad7546ef9dfb5d
     - name: psa-arch-tests
       repo-path: sdk-psa-arch-tests
       path: modules/tee/tf-m/psa-arch-tests
-      revision: 3da9313e64806d352c519e3205e81cf959067588
+      revision: ecd6864211894fca9d3cc4d87908f7b974c2a7d4
     - name: matter
       repo-path: sdk-connectedhomeip
       path: modules/lib/matter
@@ -176,14 +176,14 @@ manifest:
     - name: nrf-802154
       repo-path: sdk-nrf-802154
       path: nrf-802154
-      revision: f469dc339856010e9b5cab494bd99dbecefc0025
+      revision: 5a34646bdebdddafe5902119ad3c894be7d051ce
       groups:
         - nrf-802154
     - name: dragoon
       # Only for internal Nordic development
       repo-path: dragoon.git
       remote: dragoon
-      revision: 6b1ee645952847054d95b3e38836e6b6466b3f90
+      revision: 124494f2406783eeeac5cbb33fdceb0c708842c1
       groups:
         - dragoon
     - name: cjson

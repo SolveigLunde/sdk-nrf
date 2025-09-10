@@ -34,7 +34,11 @@ IDE, OS, and tool support
 =========================
 
 * Added macOS 26 support (Tier 3) to the table listing :ref:`supported operating systems for proprietary tools <additional_nordic_sw_tools_os_support>`.
-* Updated the required `SEGGER J-Link`_ version to v8.60.
+* Updated:
+
+  * The required `SEGGER J-Link`_ version to v8.60.
+  * Steps on the :ref:`install_ncs` page for installing the |NCS| and toolchain together.
+    With this change, the separate steps to install the toolchain and the SDK were merged into a single step.
 
 Board support
 =============
@@ -49,7 +53,7 @@ Build and configuration system
 Bootloaders and DFU
 ===================
 
-|no_changes_yet_note|
+* Added an option to restore progress after a power failure when using DFU multi-image with MCUboot.
 
 Developing with nRF91 Series
 ============================
@@ -89,7 +93,10 @@ Developing with Thingy:91 X
 Developing with Thingy:91
 =========================
 
-|no_changes_yet_note|
+* Updated the title of the page about updating the Thingy:91 firmware using the Cellular Monitor app to :ref:`thingy91_update_firmware`.
+* Removed the page about updating the Thingy:91 firmware using the Programmer app.
+  Its contents are now available in the app documentation on the `Programming Nordic Thingy prototyping platforms`_ page.
+  The :ref:`thingy91_partition_layout` section has been moved to the :ref:`thingy91_update_firmware` page.
 
 Developing with Thingy:53
 =========================
@@ -264,6 +271,8 @@ Amazon Sidewalk samples
 
 Bluetooth samples
 -----------------
+
+* Added the :ref:`samples_test_app` application to demonstrate how to use the Bluetooth LE Test GATT Server and test Bluetooth LE functionality in peripheral samples.
 
 * Updated the network core image applications for the following samples from the :zephyr:code-sample:`bluetooth_hci_ipc` sample to the :ref:`ipc_radio` application for multicore builds:
 
@@ -470,7 +479,15 @@ Wi-Fi samples
 Other samples
 -------------
 
-|no_changes_yet_note|
+* :ref:`nrf_profiler_sample` sample:
+
+  * Added a new testing step demonstrating how to calculate event propagation statistics.
+    Also added the related test preset for the :file:`calc_stats.py` script (:file:`nrf/scripts/nrf_profiler/stats_nordic_presets/nrf_profiler.json`).
+
+* :ref:`app_event_manager_profiling_tracer_sample` sample:
+
+  * Added a new testing step demonstrating how to calculate event propagation statistics.
+    Also added the related test preset for the :file:`calc_stats.py` script (:file:`nrf/scripts/nrf_profiler/stats_nordic_presets/app_event_manager_profiler_tracer.json`).
 
 Drivers
 =======
@@ -500,7 +517,11 @@ Binary libraries
 Bluetooth libraries and services
 --------------------------------
 
-|no_changes_yet_note|
+* :ref:`hids_readme` library:
+
+  * Updated the report length of the HID boot mouse to ``3``.
+    The :c:func:`bt_hids_boot_mouse_inp_rep_send` function only allows to provide the state of the buttons and mouse movement (for both X and Y axes).
+    No additional data can be provided by the application.
 
 Common Application Framework
 ----------------------------
@@ -551,6 +572,25 @@ Libraries for networking
   * :ref:`lib_fota_download`
   * :ref:`lib_ftp_client`
 
+* :ref:`lib_nrf_provisioning` library:
+
+  * Added a blocking call to wait for a functional-mode change, relocating the logic from the app into the library.
+
+  * Updated:
+
+    * By making internal scheduling optional.
+      Applications can now trigger provisioning manually using the :kconfig:option:`CONFIG_NRF_PROVISIONING_SCHEDULED` Kconfig option.
+    * By moving root CA provisioning to modem initialization callback to avoid blocking and ensure proper state.
+    * By expanding the event handler to report more provisioning events, including failures.
+    * By making the event handler callback mandatory to notify the application of failures and prevent silent errors.
+    * By unifying the device‐mode and modem‐mode callbacks into a single handler for cleaner integration.
+    * The documentation and sample code accordingly.
+
+  * Fixed multiple bugs and enhanced error handling.
+
+* Deprecated the :ref:`lib_nrf_cloud_rest` library.
+  Use the :ref:`lib_nrf_cloud_coap` library instead.
+
 Libraries for NFC
 -----------------
 
@@ -564,7 +604,9 @@ nRF RPC libraries
 Other libraries
 ---------------
 
-|no_changes_yet_note|
+* :ref:`nrf_profiler` library:
+
+  * Updated the documentation by separating out the :ref:`nrf_profiler_script` documentation.
 
 Shell libraries
 ---------------
@@ -579,7 +621,10 @@ See the changelog for each library in the :doc:`nrfxlib documentation <nrfxlib:R
 Scripts
 =======
 
-* Added the :ref:`esb_sniffer_scripts` scripts for the :ref:`esb_monitor` sample.
+* Added:
+
+  * The :ref:`esb_sniffer_scripts` scripts for the :ref:`esb_monitor` sample.
+  * The documentation page for :ref:`nrf_profiler_script`.
 
 Integrations
 ============

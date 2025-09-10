@@ -256,7 +256,10 @@ function(partition_manager)
       # So for each domain we should just include the generated hex file.
       # Those are available thorugh sysbuild_get, but not locally as there is no parent image.
       list(APPEND explicitly_assigned ${part})
-      sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_HEX_NAME CACHE)
+      sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_CONFIRMED_HEX_NAME CACHE)
+      if(NOT ${part}_PM_HEX_FILE)
+        sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_HEX_NAME CACHE)
+      endif()
       if(NOT ${part}_PM_HEX_FILE)
         sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_HEX_NAME CACHE)
       endif()
@@ -510,6 +513,8 @@ foreach(d APP ${PM_DOMAINS})
   sysbuild_get(${image_name}_CONFIG_SOC_NRF54L15_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L15_CPUAPP KCONFIG)
   sysbuild_get(${image_name}_CONFIG_SOC_NRF54L05_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L05_CPUAPP KCONFIG)
   sysbuild_get(${image_name}_CONFIG_SOC_NRF54L10_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L10_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP KCONFIG)
 
   if(${image_name}_CONFIG_SOC_SERIES_NRF91X)
     # See nRF9160 Product Specification, chapter "UICR"
@@ -526,6 +531,8 @@ foreach(d APP ${PM_DOMAINS})
     if(DEFINED ${image_name}_CONFIG_SOC_NRF54L15_CPUAPP
       OR DEFINED ${image_name}_CONFIG_SOC_NRF54L05_CPUAPP
       OR DEFINED ${image_name}_CONFIG_SOC_NRF54L10_CPUAPP
+      OR DEFINED ${image_name}_CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP
+      OR DEFINED ${image_name}_CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP
       )
       set(otp_start_addr "0xffd500")
       set(otp_size 1276)  # 319 * 4
@@ -557,7 +564,7 @@ foreach(d APP ${PM_DOMAINS})
   sysbuild_get(${image_name}_CONFIG_FLASH_SIZE IMAGE ${image_name} VAR CONFIG_FLASH_SIZE KCONFIG)
   math(EXPR flash_size "${${image_name}_CONFIG_FLASH_SIZE} * 1024" OUTPUT_FORMAT HEXADECIMAL)
 
-  if (${image_name}_CONFIG_SOC_SERIES_NRF91X OR ${image_name}_CONFIG_SOC_NRF5340_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L15_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L05_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L10_CPUAPP)
+  if (${image_name}_CONFIG_SOC_SERIES_NRF91X OR ${image_name}_CONFIG_SOC_NRF5340_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L15_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L05_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L10_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP)
     add_region(
       NAME otp
       SIZE ${otp_size}

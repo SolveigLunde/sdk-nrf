@@ -149,7 +149,13 @@ static void cloud_ready(void)
 	if (IS_ENABLED(CONFIG_NRF_PROVISIONING)) {
 		LOG_INF("Reducing provisioning check interval to %d minutes",
 			CONFIG_POST_PROVISIONING_INTERVAL_M);
-		nrf_provisioning_set_interval(CONFIG_POST_PROVISIONING_INTERVAL_M * SEC_PER_MIN);
+
+		int err = nrf_provisioning_set_interval(
+			CONFIG_POST_PROVISIONING_INTERVAL_M * SEC_PER_MIN);
+
+		if (err) {
+			LOG_ERR("Failed to set provisioning interval, err %d", err);
+		}
 	}
 }
 
@@ -561,7 +567,7 @@ static int setup_cloud(void)
 	 * the notification.
 	 *
 	 * If that is a serious concern, use SYS_INIT with priority 0 (less than
-	 * CONFIG_NET_CONNECTION_MANAGER_PRIORITY) to register this hook before conn_mgr
+	 * CONFIG_NET_CONNECTION_MANAGER_MONITOR_PRIORITY) to register this hook before conn_mgr
 	 * initializes.
 	 *
 	 * In reality, connectivity layers such as LTE take some time to go online, so registering

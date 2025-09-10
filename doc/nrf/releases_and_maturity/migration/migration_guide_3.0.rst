@@ -105,6 +105,37 @@ ZMS settings backend
    To migrate from the legacy backend to the new backend remove the Kconfig options :kconfig:option:`CONFIG_SETTINGS_ZMS_NAME_CACHE`
    and :kconfig:option:`CONFIG_SETTINGS_ZMS_NAME_CACHE_SIZE` from your conf files.
 
+Bluetooth® LE legacy pairing
+----------------------------
+
+.. toggle::
+
+   Support for Bluetooth LE legacy pairing is no longer enabled by default because it is not secure.
+   The :kconfig:option:`CONFIG_BT_SMP_SC_PAIR_ONLY` Kconfig option is enabled by default in Zephyr.
+   If you still need to support the Bluetooth LE legacy pairing and you accept the security risks, disable the option in the configuration.
+
+   .. caution::
+      Using Bluetooth LE legacy pairing introduces, among others, a risk of passive eavesdropping.
+      Supporting Bluetooth LE legacy pairing makes devices vulnerable to downgrade attacks.
+
+CRACEN initialization
+---------------------
+
+.. toggle::
+
+   In the |NCS| versions 2.8.0 and 2.9.0, you must explicitly configure the CRACEN initialization.
+   It is done by adding the :kconfig:option:`CONFIG_CRACEN_LOAD_MICROCODE` Kconfig option to the image configuration.
+   This option allows to select the given image to initialize CRACEN.
+
+   However, from |NCS| 3.0.0, CRACEN is automatically initialized.
+   The new build configuration option (:kconfig:option:`SB_CONFIG_CRACEN_MICROCODE_LOAD_ONCE`) now controls this process at the sysbuild level.
+   When enabled, the build system automatically determines which image must handle the initialization of CRACEN.
+
+   Unlike in the |NCS| versions 2.8.0 and 2.9.0, where CRACEN initialization is disabled by default in the MCUboot configuration, CRACEN is initialized by the earliest bootloader by default in the |NCS| 3.0.0.
+   This change can lead to scenarios where CRACEN might be initialized twice or not initialized at all.
+   When migrating from the |NCS| v2.9.0 to v3.0.0, you must analyze which image is responsible for initializing CRACEN before and after the firmware update to ensure correct operation.
+   Make sure to adjust your bootloader or application upgrade path accordingly to avoid any issues related to CRACEN initialization.
+
 nRF54H20
 ========
 
@@ -500,8 +531,8 @@ Serial LTE Modem
 
    * Errors that were previously notified to the application with the ``LWM2M_CARRIER_ERROR_RUN`` event type have instead been added to :c:macro:`LWM2M_CARRIER_ERROR_CONFIGURATION`.
 
-Bluetooth® Fast Pair Locator tag
---------------------------------
+Bluetooth Fast Pair Locator tag
+-------------------------------
 
 .. toggle::
 

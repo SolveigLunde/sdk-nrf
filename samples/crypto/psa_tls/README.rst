@@ -110,7 +110,6 @@ The table mirrors the test setup used for TLS verification.
            - RSA not supported
            - Also supports :ref:`PSA Crypto nrf_oberon driver<nrf_security_drivers_oberon>`
          * - ``nrf54lm20dk/nrf54lm20a/cpuapp``
-             ``nrf54lm20pdk/nrf54lm20/cpuapp``
            - :ref:`PSA Crypto CRACEN driver<nrf_security_drivers_cracen>`
            - No
            - Yes
@@ -118,7 +117,7 @@ The table mirrors the test setup used for TLS verification.
            - Also supports :ref:`PSA Crypto nrf_oberon driver<nrf_security_drivers_oberon>`
          * - ``nrf54h20dk/nrf54h20/cpuapp``
              ``nrf54h20dk/nrf54h20/cpurad``
-           - `SSF Crypto <CONFIG_PSA_SSF_CRYPTO_CLIENT_>`_
+           - SSF Crypto (`CONFIG_PSA_SSF_CRYPTO_CLIENT`_)
            - No
            - Yes
            - RSA not supported
@@ -149,7 +148,6 @@ The table mirrors the test setup used for TLS verification.
            - RSA not supported
            - Also supports :ref:`PSA Crypto nrf_oberon driver<nrf_security_drivers_oberon>`
          * - ``nrf54lm20dk/nrf54lm20a/cpuapp``
-             ``nrf54lm20pdk/nrf54lm20/cpuapp``
            - :ref:`PSA Crypto CRACEN driver<nrf_security_drivers_cracen>`
            - No
            - Yes
@@ -157,7 +155,7 @@ The table mirrors the test setup used for TLS verification.
            - Also supports :ref:`PSA Crypto nrf_oberon driver<nrf_security_drivers_oberon>`
          * - ``nrf54h20dk/nrf54h20/cpuapp``
              ``nrf54h20dk/nrf54h20/cpurad``
-           - `SSF Crypto <CONFIG_PSA_SSF_CRYPTO_CLIENT_>`_
+           - SSF Crypto (`CONFIG_PSA_SSF_CRYPTO_CLIENT`_)
            - No
            - No
            - RSA not supported

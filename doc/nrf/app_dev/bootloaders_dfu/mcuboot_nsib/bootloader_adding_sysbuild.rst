@@ -146,12 +146,10 @@ See :ref:`ug_fw_update_keys` for information on how to generate custom keys for 
 
 For SoCs using KMU for NSIB (nRF54L Series devices), the private key must be provisioned in the KMU before NSIB can be run.
 
-Additionally, the |NSIB| supports the following methods for signing images with private keys:
+Additionally, the |NSIB| supports a custom method for signing images with private keys:
 
-* Uses the :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_OPENSSL` Kconfig option.
 * :ref:`Using a custom command <ug_bootloader_adding_sysbuild_immutable_b0_custom_signing>` - Uses the :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_CUSTOM` Kconfig option.
 
-The OpenSSL method is handled internally by the build system, whereas using custom commands requires more configuration steps.
 
 Checking the public key
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -319,18 +317,7 @@ To use MCUboot as an upgradable bootloader to your application, complete the fol
 
    |how_to_configure|
 
-#. Optionally, you can configure MCUboot to use the cryptographic functionality exposed by the immutable bootloader and reduce the flash memory usage for MCUboot to less than 16 kB.
-   To enable this configuration, apply both the :file:`prj_minimal.conf` Kconfig project file and the :file:`external_crypto.conf` Kconfig fragment for the MCUboot image:
-
-   .. code-block::
-
-      west build -b nrf52840dk/nrf52840 zephyr/samples/hello_world -- \
-      -DSB_CONFIG_SECURE_BOOT_APPCORE=y \
-      -DSB_CONFIG_BOOTLOADER_MCUBOOT=y \
-      -Dmcuboot_FILE_SUFFIX=minimal \
-      -Dmcuboot_EXTRA_CONF_FILE=external_crypto.conf
-
-   See :ref:`ug_bootloader_config` for more information about using Kconfig fragments with bootloaders.
+#. In order to reduce the flash memory usage for MCUboot, see :ref:`mcuboot_minimal_configuration`.
 
 The build process generates several :ref:`app_build_output_files`, including :ref:`app_build_mcuboot_output`.
 

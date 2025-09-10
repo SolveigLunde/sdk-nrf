@@ -167,13 +167,23 @@
 .. _`sdk-oberon-psa-crypto`: https://github.com/nrfconnect/sdk-oberon-psa-crypto
 .. _`Oberon PSA core changelog`: https://github.com/nrfconnect/sdk-oberon-psa-crypto/blob/main/CHANGELOG.md
 
+.. _`ISO 8601 date format`: https://www.iso.org/iso-8601-date-and-time-format.html
+.. _`X.509`: https://www.itu.int/rec/T-REC-X.509-201910-I/en
+
 .. ### Matter links that need updated SHA per release
 
-.. _`other controller setups`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/022f2c9/src/controller
-.. _`CHIP Certificate Tool source files`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/022f2c9/src/tools
-.. _`Bluetooth LE Arbiter's header file`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/022f2c9/src/platform/Zephyr/BLEAdvertisingArbiter.h
-.. _`LogModule enumeration`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/022f2c9/src/lib/support/logging/Constants.h
-.. _`Matter SDK's Logging header`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/022f2c9/src/lib/support/logging/CHIPLogging.h
+.. _`other controller setups`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/06523c2/src/controller
+.. _`CHIP Certificate Tool source files`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/06523c2/src/tools
+.. _`Bluetooth LE Arbiter's header file`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/src/platform/Zephyr/BLEAdvertisingArbiter.h
+.. _`LogModule enumeration`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/src/lib/support/logging/Constants.h
+.. _`Matter SDK's Logging header`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/src/lib/support/logging/CHIPLogging.h
+.. _`Factory Data Provider`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/src/platform/nrfconnect/FactoryDataProvider.h
+.. _`Matter nRF Connect platform source files`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/06523c2/src/platform/nrfconnect
+.. _`Generate factory data script`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/scripts/tools/nrfconnect/generate_nrfconnect_chip_factory_data.py
+.. _`Factory data schema`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/scripts/tools/nrfconnect/nrfconnect_factory_data.schema
+.. _`Generate partition script`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/scripts/tools/nrfconnect/nrfconnect_generate_partition.py
+.. _`Matter nRF Connect scripts`: https://github.com/nrfconnect/sdk-connectedhomeip/tree/06523c2/scripts/tools/nrfconnect
+.. _`Matter nRF Connect Kconfig`: https://github.com/nrfconnect/sdk-connectedhomeip/blob/06523c2/config/nrfconnect/chip-module/Kconfig
 
 .. _`bt_nus_service.cpp`: https://github.com/nrfconnect/sdk-nrf/blob/main/samples/matter/common/src/bt_nus/bt_nus_service.cpp
 .. _`bt_nus_service.h`: https://github.com/nrfconnect/sdk-nrf/blob/main/samples/matter/common/src/bt_nus/bt_nus_service.h
@@ -454,6 +464,8 @@
 .. _`TF-M Inter-Process Communication`: https://docs.nordicsemi.com/bundle/ncs-latest/page/tfm/design_docs/services/tfm_psa_inter_process_communication.html
 .. _`FF-M Isolation Rules`: https://docs.nordicsemi.com/bundle/ncs-latest/page/tfm/design_docs/ff_isolation.html
 
+.. _`Fprotect`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrf/libraries/security/bootloader/fprotect.html
+
 .. _`HCI Events`: https://docs.nordicsemi.com/bundle/ncs-latest/page/nrfxlib/softdevice_controller/doc/api.html#hci_events
 
 .. _`nPM2100 Datasheet`: https://docs.nordicsemi.com/bundle/ps_npm2100/page/keyfeatures_html5.html
@@ -703,9 +715,10 @@
 .. _`Direct Test Mode app`: https://docs.nordicsemi.com/bundle/nrf-connect-direct-test-mode/page/index.html
 
 .. _`Programmer app`: https://docs.nordicsemi.com/bundle/nrf-connect-programmer/page/index.html
-.. _`Programming the nRF52840 Dongle`:
+.. _`Programming the nRF52840 Dongle`: https://docs.nordicsemi.com/bundle/nrf-connect-programmer/page/programming_nrf52840_dongle.html
 .. _`Programming a Development Kit`: https://docs.nordicsemi.com/bundle/nrf-connect-programmer/page/programming_dk.html
-.. _`Programming Nordic Thingy53`: https://docs.nordicsemi.com/bundle/nrf-connect-programmer/page/programming_dk.html#programming-nordic-thingy53
+.. _`Programming Nordic Thingy53`:
+.. _`Programming Nordic Thingy prototyping platforms`: https://docs.nordicsemi.com/bundle/nrf-connect-programmer/page/programming_thingy.html
 
 .. _`Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/index.html
 .. _`Connecting using the Serial Terminal app`: https://docs.nordicsemi.com/bundle/nrf-connect-serial-terminal/page/connecting.html
@@ -991,7 +1004,7 @@
 
 .. _`Unauthorized Thread Network Key Update (SA-2023-234) vulnerability`: https://docs.nordicsemi.com/bundle/SA/resource/SA-2023-234-v1_1.pdf
 
-.. _`latest release notes for nRF Connect for Visual Studio Code`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/release_notes/connect/2024.2.214.html
+.. _`latest release notes for nRF Connect for Visual Studio Code`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/rel_notes_overview.html
 .. _`nRF Connect for Visual Studio Code`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/index.html
 .. _`Configuring with nRF Kconfig`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/work_with_kconfig.html
 .. _`How to create devicetree files`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/how_to_create_dt_files.html
@@ -1001,6 +1014,7 @@
 .. _`How to work with boards and devices`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/bd_work_with_boards.html
 .. _`How to install the extension`:
 .. _`Installing on Linux`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/get_started/install.html
+.. _`How to set up SDK and toolchain`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/get_started/quick_setup.html
 .. _`How to build an application`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/get_started/build_app_ncs.html
 .. _`Migrating IDE`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_welcome.html#open-an-existing-application
 .. _`How to change SDK and toolchain versions`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/extension_migrate_sdk.html
@@ -1018,7 +1032,11 @@
 .. _`Application-specific flash options`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/bd_work_with_boards.html#how-to-flash-boards
 .. _`CMake build system`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/build_overview.html#cmake-build-system
 .. _`How to work with build configurations`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/build_config.html
+.. _`Welcome View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_welcome.html
+.. _`Applications View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_applications.html
+.. _`Actions View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_actions.html
 .. _`Details View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_details.html
+.. _`Panel View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_panel.html
 .. _`Memory report`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/memory_overview.html
 .. _`Kconfig action in the Actions View`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/reference/ui_sidebar_actions.html
 .. _`Application support overview`: https://docs.nordicsemi.com/bundle/nrf-connect-vscode/page/guides/applications.html
@@ -1740,6 +1758,9 @@
 .. _`802.15.2-2003 specification`: https://standards.ieee.org/standard/802_15_2-2003.html
 
 .. _`JSON`: https://www.json.org/json-en.html
+.. _`JSON Schema Validator`: https://www.jsonschemavalidator.net
+.. _`PHP JSON Schema`: https://github.com/swaggest/php-json-schema
+.. _`JSON Schema`: https://json-schema.org/understanding-json-schema/reference
 
 .. _`SSL Labs`: https://www.ssllabs.com/ssltest/
 
