@@ -21,6 +21,7 @@ static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
 static struct bt_conn *default_conn;
 static struct bt_le_per_adv_sync *default_sync;
+static bool is_syncing;
 
 static struct __packed {
 	uint8_t subevent;
@@ -31,16 +32,17 @@ static struct __packed {
 static void sync_cb(struct bt_le_per_adv_sync *sync, 
                    struct bt_le_per_adv_sync_synced_info *info)
 {
-    struct bt_le_per_adv_sync_subevent_params params;
-    uint8_t subevents[1];
+    //struct bt_le_per_adv_sync_subevent_params params;
+    //uint8_t subevents[1];
     char le_addr[BT_ADDR_LE_STR_LEN];
-    int err;
+    //int err;
 
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
     printk("[SYNC]Synced to %s with %d subevents\n", le_addr, info->num_subevents);
 
     default_sync = sync;
 
+    /*
     params.properties = 0;
     params.num_subevents = 1;
     params.subevents = subevents;
@@ -52,7 +54,7 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     } else {
         printk("[SYNC] Changed sync to subevent %d\n", subevents[0]);
     }
-
+    */
     k_sem_give(&sem_per_sync);
 }
 
@@ -65,7 +67,7 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
 
 
     default_sync = NULL;
-
+    is_syncing = false;
     k_sem_give(&sem_per_sync_lost);
 }
 
@@ -161,6 +163,7 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
 	subevents[0] = pawr_timing.subevent;
 
 	if (default_sync) {
+        k_sleep(K_MSEC(10));
 		err = bt_le_per_adv_sync_subevent(default_sync, &params);
 		if (err) {
 			printk("[TIMING] Error: Failed to set subevents (err %d)\n", err);
@@ -180,9 +183,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
     if (err) {
         printk("[SYNC]Failed to connect (err 0x%02X)\n", err);
         default_conn = NULL;
+        is_syncing = false;
         return;
     }
 
+    is_syncing = true;
     default_conn = bt_conn_ref(conn);
 
     /* Accept 2M PHY if requested */
@@ -204,6 +209,10 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
     bt_conn_unref(default_conn);
     default_conn = NULL;
+
+    if(!default_sync){
+        is_syncing = false;
+    }
 }
 
 
@@ -241,16 +250,36 @@ int main(void)
 	}
 
 	do {
-		err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
-		if (err && err != -EALREADY) {
-			printk("[ADV] Error: Failed to start (err %d)\n", err);
-			return 0;
-		}
+        if(is_syncing && !default_conn && !default_sync){
+            is_syncing = false;
+        }
+        
+        if(!is_syncing){
+            bt_le_adv_stop();
 
+            err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
+            if (err){
+                if (err == -EALREADY) {
+                k_sleep(K_MSEC(10));
+                continue;
+                } else if(err == -ENOMEM){
+                    k_sleep(K_MSEC(500));
+                    continue;
+                } else{
+                    printk("[ADV] Error: Failed to start (err %d)\n", err);
+                    k_sleep(K_MSEC(100));
+                    continue;
+                }
+            } 
+        }
+        
 		printk("[SYNC] Waiting for sync...\n");
+
 		err = k_sem_take(&sem_per_sync, K_SECONDS(10));
 		if (err) {
-			//printk("[SYNC] Error: Timeout while syncing\n");
+			printk("[SYNC] Error: Timeout while syncing\n");
+            is_syncing = false; 
+            k_sleep(K_MSEC(100));
 			continue;
 		}
 

@@ -34,8 +34,6 @@
 static uint32_t total_bytes;
 static uint64_t stamp;
 
-
-
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
     const uint8_t MIN_PAWR_INTERVAL_MS = 50;          
