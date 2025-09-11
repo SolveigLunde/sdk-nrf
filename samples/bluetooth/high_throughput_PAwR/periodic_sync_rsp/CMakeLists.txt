@@ -8,3 +8,4 @@ project(periodic_sync_rsp)
 target_compile_definitions(app PRIVATE CONFIG_CBPRINTF_FP_SUPPORT=y)
 
 target_sources(app PRIVATE src/main.c)
+

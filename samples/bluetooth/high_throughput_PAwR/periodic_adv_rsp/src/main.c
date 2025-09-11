@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: Apache-2.0
- */
+* Copyright (c) 2023 Nordic Semiconductor ASA
+*
+* SPDX-License-Identifier: Apache-2.0
+*/
 
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
-
 
 /*
 * PAwR Throughput Demo
@@ -28,157 +27,66 @@
 #define PACKET_SIZE   251
 #define NAME_LEN      30
 
-#define MAX_INDIVIDUAL_RESPONSE_SIZE 247
+#define SYNC_RSP_SIZE 232  // Optimal size for 1.25ms slot alignment
 #define THROUGHPUT_PRINT_INTERVAL 1000 
+#define UNIT_MS 1.25
 
 static uint32_t total_bytes;
 static uint64_t stamp;
 
 typedef struct {
-    uint8_t num_devices;
-    uint16_t packet_size;
-    uint16_t total_bytes_per_interval;
-    uint16_t interval_ms;
+	uint8_t num_devices;
+	uint16_t packet_size;
+	uint16_t total_bytes_per_interval;
+	uint16_t interval_ms;
 } config_t;
 
-
-
-config_t calculate_optimal_config_interval(uint8_t num_response_slots) {
-    config_t config = {0};
-   
-    uint16_t max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    uint16_t total_bytes = num_response_slots * max_packet_size;
-    config.num_devices = num_response_slots;
-    config.packet_size = max_packet_size;
-    config.total_bytes_per_interval = total_bytes;
-   
-    return config;
-}
- 
- 
-void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
-{
-    const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;  
-    const uint8_t MIN_PAWR_INTERVAL_MS = 50;          
-    const float MARGIN_MS = 8.0f;                 
-    const float ADVERTISER_GUARD_MS = 5.0f;           
-    const uint8_t PHY_RATE_MBPS = 2;                  
-    const float SLOT_GUARD_TIME_MS = 0.5f;     
-    
-    uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    
-    float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000); 
-    float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);  
-
-    uint8_t slot_spacing = (uint8_t)((slot_time_ms + 0.124f) / 0.125f);
-    if (slot_spacing < 8) slot_spacing = 8;  
-
-    uint8_t delay = MIN_RESPONSE_SLOT_DELAY_UNITS;
-
-    float subevent_duration_ms = delay * 1.25f + num_response_slots * (slot_spacing * 0.125f);
-
-    float total_event_time_ms = (delay * 1.25f) + (num_response_slots * slot_time_ms) 
-                               + ADVERTISER_GUARD_MS + MARGIN_MS;
-
-    uint16_t subevent_interval_units = (uint16_t)ceilf(subevent_duration_ms / 1.25f);
-    
-    uint16_t min_interval_units = (uint16_t)ceilf(MIN_PAWR_INTERVAL_MS / 1.25f);
-    uint16_t required_interval_units = (uint16_t)ceilf(total_event_time_ms / 1.25f);
-    uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units) ? 
-                                               required_interval_units : min_interval_units;
-
-    params->interval_min = advertising_event_interval_units;
-    params->interval_max = advertising_event_interval_units;
-    params->num_subevents = 1;
-    params->subevent_interval = subevent_interval_units;
-    params->response_slot_delay = delay;
-    params->response_slot_spacing = slot_spacing;
-    params->num_response_slots = num_response_slots;
-
-    uint32_t adv_event_ms = (uint32_t)(advertising_event_interval_units * 1.25f);
-    uint32_t subevent_ms = (uint32_t)(subevent_interval_units * 1.25f);
-    uint32_t slot_ms_x100 = (uint32_t)(slot_spacing * 0.125f * 100);
-    uint32_t est_throughput_kbps = (uint32_t)((num_response_slots * packet_size * 8ULL * 1000ULL) / 
-                                             (advertising_event_interval_units * 1.25f)) / 1000;
-
-    printk("PAwR config:\n");
-    printk("  Devices: %d, Slot: %u.%02u ms, Delay: %u, SubEvt: %u ms\n",
-           num_response_slots, slot_ms_x100/100, slot_ms_x100%100, delay, subevent_ms);
-    printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
-           adv_event_ms, est_throughput_kbps);
-}
-
-/* Attempt at new function using the upper and lower limits of the parameters, does not work as i want it to yet:{
-void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
-{
-    const uint8_t MIN_RESPONSE_SLOT_SPACING_UNITS = 2;   // 0.25 ms
-    const uint8_t MAX_RESPONSE_SLOT_SPACING_UNITS = 255; // 31.875 ms
-    const uint8_t MIN_SUBEVENT_INTERVAL_UNITS = 6;       // 7.5 ms
-    const uint8_t MAX_SUBEVENT_INTERVAL_UNITS = 255;     // 318.75 ms
-    const uint8_t MIN_PAWR_INTERVAL_UNITS = 40;          // 50 ms (40 * 1.25)
-    const uint8_t PHY_RATE_MBPS = 2;
-    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    const float SLOT_GUARD_TIME_MS = 0.5f;
-    const float ADVERTISER_GUARD_MS = 5.0f;
-    const float MARGIN_MS = 8.0f;
-
-    float best_throughput = 0;
-    uint8_t best_slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS;
-    uint8_t best_delay = MIN_SUBEVENT_INTERVAL_UNITS;
-    uint8_t best_subevent_interval = MIN_SUBEVENT_INTERVAL_UNITS;
-    uint16_t best_adv_interval_units = MIN_PAWR_INTERVAL_UNITS;
-
-    // Sweep slot spacing and delay for best throughput
-    for (uint8_t slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS; slot_spacing <= MAX_RESPONSE_SLOT_SPACING_UNITS; slot_spacing++) {
-        float slot_spacing_ms = slot_spacing * 0.125f;
-        float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000);
-        float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, slot_spacing_ms);
-
-        for (uint8_t delay = MIN_SUBEVENT_INTERVAL_UNITS; delay <= 20; delay++) { // 20 units = 25 ms, reasonable upper bound
-            float delay_ms = delay * 1.25f;
-            float subevent_duration_ms = delay_ms + num_response_slots * slot_spacing_ms;
-            uint8_t subevent_interval_units = (uint8_t)ceilf(subevent_duration_ms / 1.25f);
-            if (subevent_interval_units < MIN_SUBEVENT_INTERVAL_UNITS || subevent_interval_units > MAX_SUBEVENT_INTERVAL_UNITS)
-                continue;
-
-            float total_event_time_ms = delay_ms + num_response_slots * slot_time_ms + ADVERTISER_GUARD_MS + MARGIN_MS;
-            uint16_t adv_interval_units = (uint16_t)ceilf(total_event_time_ms / 1.25f);
-            if (adv_interval_units < MIN_PAWR_INTERVAL_UNITS)
-                adv_interval_units = MIN_PAWR_INTERVAL_UNITS;
-
-            // Throughput in kbps
-            float throughput = (num_response_slots * packet_size * 8.0f) / (adv_interval_units * 1.25f);
-
-            if (throughput > best_throughput) {
-                best_throughput = throughput;
-                best_slot_spacing = slot_spacing;
-                best_delay = delay;
-                best_subevent_interval = subevent_interval_units;
-                best_adv_interval_units = adv_interval_units;
-            }
-        }
-    }
-
-    params->interval_min = best_adv_interval_units;
-    params->interval_max = best_adv_interval_units;
-    params->num_subevents = 1;
-    params->subevent_interval = best_subevent_interval;
-    params->response_slot_delay = best_delay;
-    params->response_slot_spacing = best_slot_spacing;
-    params->num_response_slots = num_response_slots;
-
-    uint32_t adv_event_ms = (uint32_t)(best_adv_interval_units * 1.25f);
-    uint32_t subevent_ms = (uint32_t)(best_subevent_interval * 1.25f);
-    uint32_t slot_ms_x100 = (uint32_t)(best_slot_spacing * 0.125f * 100);
-    uint32_t est_throughput_kbps = (uint32_t)best_throughput;
-
-    printk("PAwR config (auto):\n");
-    printk("  Devices: %d, Slot: %u.%02u ms, Delay: %u, SubEvt: %u ms\n",
-           num_response_slots, slot_ms_x100/100, slot_ms_x100%100, best_delay, subevent_ms);
-    printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
-           adv_event_ms, est_throughput_kbps);
-}
+/*
+periodic advertising interval: 7.5 to 81.9 ms,
+subevent_interval, from start of one subevent to start of next subevent, 7.5 ms and up to about 300, 
+rsp_slot_delay, time from subevent start to the first response slot, 1.25 ms to about 300,
+rsp_slot_spacing, time from start of one slot to the start of the next slot, 0.25 to about 31.875,
+response_slots = number of devices
 */
+
+void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots) {
+    // Fixed optimal values that don't depend on number of devices
+    const uint8_t RSP_DELAY = 1;          // Always use minimum 1.25ms delay
+    const uint8_t SLOT_SPACING = 9;       // Optimal 1.125ms per slot (9 * 0.125ms)
+    
+    // Calculate total time needed in milliseconds:
+    // needed_ms = initial_delay + (num_devices * slot_time)
+    // = 1.25ms + (num_devices * 1.125ms)
+    //float needed_ms = 1.25f + (num_response_slots * 1.125f);
+    
+    // Convert to 1.25ms units, rounding up
+
+
+	uint16_t min_units = (uint16_t)(1 + (9u * num_response_slots + 9u) / 10u);
+	uint8_t interval_units = (min_units < 6 ? 6 : min_units);
+
+	interval_units += 1;
+    
+    // Set parameters
+    params->interval_min = interval_units;
+    params->interval_max = interval_units;
+    params->num_subevents = 1;
+    params->subevent_interval = interval_units;
+    params->response_slot_delay = RSP_DELAY;
+    params->response_slot_spacing = SLOT_SPACING;
+    params->num_response_slots = num_response_slots;
+
+    // Calculate and print throughput statistics
+    uint32_t throughput_kbps = (uint32_t)((num_response_slots * SYNC_RSP_SIZE * 8.0f * 1000.0f) / 
+                                         (interval_units * 1.25f)) / 1000;
+
+    printk("PAwR Config for %d devices:\n", num_response_slots);
+    printk("  Packet Size: %d bytes\n", SYNC_RSP_SIZE);
+    printk("  Response Slot: 1.125 ms (9 * 0.125ms)\n");
+    printk("  Initial Delay: 1.25 ms (1 * 1.25ms)\n");
+    printk("  Total Time: %.2f ms (%d * 1.25ms)\n", interval_units * 1.25f, interval_units);
+    printk("  Est. Throughput: %d kbps\n", throughput_kbps);
+}
 
 static struct bt_le_per_adv_param per_adv_params;
 
@@ -198,120 +106,122 @@ static uint8_t response_bitmap[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVI
 static uint8_t expected_responses[BITMAP_BYTES_NEEDED(CONFIG_BT_MAX_THROUGHPUT_DEVICES)];
 
 static void bitmap_set_bit(uint8_t *bitmap, int bit) {
-    bitmap[bit / 8] |= (1 << (bit % 8));
+	bitmap[bit / 8] |= (1 << (bit % 8));
 }
 
 static bool bitmap_test_bit(const uint8_t *bitmap, int bit) {
-    return (bitmap[bit / 8] & (1 << (bit % 8))) != 0;
+	return (bitmap[bit / 8] & (1 << (bit % 8))) != 0;
 }
 
 static void bitmap_clear(uint8_t *bitmap, int num_bits) {
-    memset(bitmap, 0, BITMAP_BYTES_NEEDED(num_bits));
+	memset(bitmap, 0, BITMAP_BYTES_NEEDED(num_bits));
 }
 
 static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_data_request *request)
 {
-    int err;
-    uint8_t to_send;
-    struct net_buf_simple *buf;
+	int err;
+	uint8_t to_send;
+	struct net_buf_simple *buf;
 
-    if (!request) {
-        printk("Error: NULL request received\n");
-        return;
-    }
+	if (!request) {
+		printk("Error: NULL request received\n");
+		return;
+	}
 
-    to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
+	to_send = MIN(request->count, ARRAY_SIZE(subevent_data_params));
 
-    uint8_t bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
-    uint8_t retransmit_bitmap[bitmap_bytes];
-    
-    for (int i = 0; i < bitmap_bytes; i++) {
-        retransmit_bitmap[i] = expected_responses[i] & (~response_bitmap[i]);
-    }
-    
-    bool has_retransmits = false;
-    for (int i = 0; i < bitmap_bytes; i++) {
-        if (retransmit_bitmap[i] != 0) {
-            has_retransmits = true;
-            break;
-        }
-    }
-    
-    if (has_retransmits) {
-        printk("Empty response slots detected:\n");
-        for (int slot = 0; slot < NUM_RSP_SLOTS; slot++) {
-            if (bitmap_test_bit(retransmit_bitmap, slot)) {
-                printk("  Slot %d: packet lost\n", slot);
-            }
-        }
-    }
+	uint8_t bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
+	uint8_t retransmit_bitmap[bitmap_bytes];
+	
+	for (int i = 0; i < bitmap_bytes; i++) {
+		retransmit_bitmap[i] = expected_responses[i] & (~response_bitmap[i]);
+	}
+	
+	bool has_retransmits = false;
+	for (int i = 0; i < bitmap_bytes; i++) {
+		if (retransmit_bitmap[i] != 0) {
+			has_retransmits = true;
+			break;
+		}
+	}
+	
+	if (has_retransmits) {
+		printk("Empty response slots detected:\n");
+		for (int slot = 0; slot < NUM_RSP_SLOTS; slot++) {
+			if (bitmap_test_bit(retransmit_bitmap, slot)) {
+				printk("  Slot %d: packet lost\n", slot);
+			}
+		}
+	}
 
-    
-    bitmap_clear(response_bitmap, NUM_RSP_SLOTS);
+	
+	bitmap_clear(response_bitmap, NUM_RSP_SLOTS);
 
-    for (size_t i = 0; i < to_send; i++) {
-        buf = &bufs[i];
-        
-        net_buf_simple_reset(buf);
-        
-        // Add manufacturer specific data with ACK bitmap
-        uint8_t *length_field = net_buf_simple_add(buf, 1);
-        net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
-        net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
-        
-        for (int j = 0; j < bitmap_bytes; j++) {
-            net_buf_simple_add_u8(buf, retransmit_bitmap[j]);
-        }
-        
-        *length_field = buf->len - 1;
+	for (size_t i = 0; i < to_send; i++) {
+		buf = &bufs[i];
+		
+		net_buf_simple_reset(buf);
+		
+		// Add manufacturer specific data with ACK bitmap
+		uint8_t *length_field = net_buf_simple_add(buf, 1);
+		net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
+		net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
+		
+		for (int j = 0; j < bitmap_bytes; j++) {
+			net_buf_simple_add_u8(buf, retransmit_bitmap[j]);
+		}
+		
+		*length_field = buf->len - 1;
 
-        subevent_data_params[i].subevent = request->start + i;
-        subevent_data_params[i].response_slot_start = 0;
-        subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
-        subevent_data_params[i].data = buf;
-    }
+		subevent_data_params[i].subevent = request->start + i;
+		subevent_data_params[i].response_slot_start = 0;
+		subevent_data_params[i].response_slot_count = NUM_RSP_SLOTS;
+		subevent_data_params[i].data = buf;
+	}
 
-    err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
-    if (err) {
-        printk("Failed to set subevent data (err %d)\n", err);
-    } 
+	err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
+	if (err) {
+		printk("Failed to set subevent data (err %d)\n", err);
+	} 
 }
 
 
 
 static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response_info *info,
-                     struct net_buf_simple *buf)
+					struct net_buf_simple *buf)
 {
-    int64_t delta;
+	int64_t delta;
 
-    if (buf) {
+	if (buf) {
 
-        /* Initialize timestamp on first response */
-        if (total_bytes == 0) {
-            stamp = k_uptime_get_32();
-        }
 
-        total_bytes += buf->len;
+		/* Initialize timestamp on first response */
+		if (total_bytes == 0) {
+			stamp = k_uptime_get_32();
+		}
 
-        if (info->response_slot < NUM_RSP_SLOTS) {
-            bitmap_set_bit(response_bitmap, info->response_slot);
-            
-            if (!bitmap_test_bit(expected_responses, info->response_slot)) {
-                bitmap_set_bit(expected_responses, info->response_slot);
-                printk("Slot %d now actively responding\n", info->response_slot);
-            }
-        }
-        
-        if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_INTERVAL) {
-            delta = k_uptime_delta(&stamp);
+
+		total_bytes += buf->len;
+
+		if (info->response_slot < NUM_RSP_SLOTS) {
+			bitmap_set_bit(response_bitmap, info->response_slot);
+			
+			if (!bitmap_test_bit(expected_responses, info->response_slot)) {
+				bitmap_set_bit(expected_responses, info->response_slot);
+				printk("Slot %d now actively responding\n", info->response_slot);
+			}
+		}
+		
+		if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_INTERVAL) {
+			delta = k_uptime_delta(&stamp);
 			
 
-            printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-                   total_bytes, total_bytes / 1024, 
-                   delta, ((uint64_t)total_bytes * 8 / delta));
-            total_bytes = 0;
-        }
-    }
+			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
+				total_bytes, total_bytes / 1024, 
+				delta, ((uint64_t)total_bytes * 8 / delta));
+			total_bytes = 0;
+		}
+	}
 }
 
 static const struct bt_le_ext_adv_cb adv_cb = {
@@ -372,10 +282,10 @@ void remote_info_available_cb(struct bt_conn *conn, struct bt_conn_remote_info *
 }
 
 void le_param_updated(struct bt_conn *conn, uint16_t interval,
-                     uint16_t latency, uint16_t timeout)
+					uint16_t latency, uint16_t timeout)
 {
-    printk("Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
-           (double)(interval * 1.25f), latency, timeout * 10);
+	printk("Connection parameters updated: interval %.2f ms, latency %d, timeout %d ms\n",
+		(double)(interval * 1.25f), latency, timeout * 10);
 }
 
 BT_CONN_CB_DEFINE(conn_cb) = {
@@ -385,7 +295,7 @@ BT_CONN_CB_DEFINE(conn_cb) = {
 	.le_param_updated = le_param_updated,
 };
 
- 
+
 static bool data_cb(struct bt_data *data, void *user_data)
 {
 	char *name = user_data;
@@ -446,26 +356,34 @@ static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *at
 	struct bt_gatt_chrc *chrc;
 	char str[BT_UUID_STR_LEN];
 
-	printk("Discovery: attr %p\n", attr);
+	printk("[GATT] Discovery callback with attr: %p\n", attr);
 
 	if (!attr) {
+		printk("[GATT] No more attributes, discovery complete\n");
 		return BT_GATT_ITER_STOP;
+	}
+
+	if (!attr->user_data) {
+		printk("[GATT] Attribute has no user data\n");
+		return BT_GATT_ITER_CONTINUE;
 	}
 
 	chrc = (struct bt_gatt_chrc *)attr->user_data;
 
 	bt_uuid_to_str(chrc->uuid, str, sizeof(str));
-	printk("UUID %s\n", str);
+	printk("[GATT] Found characteristic with UUID: %s\n", str);
+	printk("[GATT] Properties: 0x%02X, Value Handle: %d\n", 
+		chrc->properties, chrc->value_handle);
 
 	if (!bt_uuid_cmp(chrc->uuid, &pawr_char_uuid.uuid)) {
 		pawr_attr_handle = chrc->value_handle;
-
-		printk("Characteristic handle: %d\n", pawr_attr_handle);
-
+		printk("[GATT] Found PAwR characteristic! Handle: %d\n", pawr_attr_handle);
 		k_sem_give(&sem_discovered);
+		return BT_GATT_ITER_STOP;
 	}
 
-	return BT_GATT_ITER_STOP;
+	printk("[GATT] Not our characteristic, continuing...\n");
+	return BT_GATT_ITER_CONTINUE;
 }
 
 static void write_func(struct bt_conn *conn, uint8_t err, struct bt_gatt_write_params *params)
@@ -533,7 +451,7 @@ int main(void)
 		printk("Failed to create advertising set (err %d)\n", err);
 		return 0;
 	}
-	 
+	
 	/* Set periodic advertising parameters */
 	err = bt_le_per_adv_set_param(pawr_adv, &per_adv_params);
 	if (err) {
@@ -576,32 +494,55 @@ int main(void)
 			goto disconnected;
 		}
 
+		printk("[PAST] Initiating PAST transfer...\n");
 		err = bt_le_per_adv_set_info_transfer(pawr_adv, default_conn, 0);
 		if (err) {
-			printk("Failed to send PAST (err %d)\n", err);
-
+			printk("[PAST] Failed to send PAST (err %d)\n", err);
+			if (err == -EINVAL) {
+				printk("[PAST] Error: Invalid parameters\n");
+			} else if (err == -ENOTCONN) {
+				printk("[PAST] Error: Connection lost\n");
+			} else if (err == -EBUSY) {
+				printk("[PAST] Error: Controller busy\n");
+			}
 			goto disconnect;
 		}
-		printk("PAST sent\n");
+		printk("[PAST] Transfer initiated successfully\n");
 
+		printk("[GATT] Starting characteristic discovery...\n");
 		discover_params.uuid = &pawr_char_uuid.uuid;
 		discover_params.func = discover_func;
 		discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
 		discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 		discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
 
+		printk("[GATT] Looking for UUID: ");
+		char uuid_str[BT_UUID_STR_LEN];
+		bt_uuid_to_str(&pawr_char_uuid.uuid, uuid_str, sizeof(uuid_str));
+		printk("%s\n", uuid_str);
+
 		err = bt_gatt_discover(default_conn, &discover_params);
 		if (err) {
-			printk("Discovery failed (err %d)\n", err);
+			printk("[GATT] Discovery failed to start (err %d)\n", err);
+			if (err == -EINVAL) {
+				printk("[GATT] Invalid parameters\n");
+			} else if (err == -ENOTCONN) {
+				printk("[GATT] Not connected\n");
+			} else if (err == -EALREADY) {
+				printk("[GATT] Discovery already in progress\n");
+			}
 			goto disconnect;
 		}
-		printk("Discovery started\n");
+		printk("[GATT] Discovery procedure started successfully\n");
 
+		printk("[GATT] Waiting for discovery to complete (timeout: 10s)...\n");
 		err = k_sem_take(&sem_discovered, K_SECONDS(10));
 		if (err) {
-			printk("Timed out during GATT discovery\n");
+			printk("[GATT] ERROR: Discovery timed out after 10 seconds!\n");
+			printk("[GATT] Last known state: Discovery started but no callback received\n");
 			goto disconnect;
 		}
+		printk("[GATT] Discovery completed successfully\n");
 
 		sync_config.subevent = 0; 
 		sync_config.response_slot = num_synced;  
