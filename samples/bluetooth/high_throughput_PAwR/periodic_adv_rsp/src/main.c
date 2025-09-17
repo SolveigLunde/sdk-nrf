@@ -34,35 +34,16 @@
 static uint32_t total_bytes;
 static uint64_t stamp;
 
-typedef struct {
-    uint8_t num_devices;
-    uint16_t packet_size;
-    uint16_t total_bytes_per_interval;
-    uint16_t interval_ms;
-} config_t;
 
-config_t calculate_optimal_config_interval(uint8_t num_response_slots) {
-    config_t config = {0};
-   
-    uint16_t max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    uint16_t total_bytes = num_response_slots * max_packet_size;
-    config.num_devices = num_response_slots;
-    config.packet_size = max_packet_size;
-    config.total_bytes_per_interval = total_bytes;
-   
-    return config;
-}
 
- 
- 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
-    const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;  
     const uint8_t MIN_PAWR_INTERVAL_MS = 50;          
     const float MARGIN_MS = 8.0f;                 
     const float ADVERTISER_GUARD_MS = 5.0f;           
     const uint8_t PHY_RATE_MBPS = 2;                  
-    const float SLOT_GUARD_TIME_MS = 0.5f;     
+    const float SLOT_GUARD_TIME_MS = 0.5f;
+	uint8_t delay = 6;     
     
     uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
     
@@ -72,12 +53,10 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     uint8_t slot_spacing = (uint8_t)((slot_time_ms + 0.124f) / 0.125f);
     if (slot_spacing < 8) slot_spacing = 8;  
 
-    uint8_t delay = MIN_RESPONSE_SLOT_DELAY_UNITS;
 
     float subevent_duration_ms = delay * 1.25f + num_response_slots * (slot_spacing * 0.125f);
 
-    float total_event_time_ms = (delay * 1.25f) + (num_response_slots * slot_time_ms) 
-                               + ADVERTISER_GUARD_MS + MARGIN_MS;
+    float total_event_time_ms = (delay * 1.25f) + (num_response_slots * slot_time_ms) + ADVERTISER_GUARD_MS + MARGIN_MS;
 
     uint16_t subevent_interval_units = (uint16_t)ceilf(subevent_duration_ms / 1.25f);
     
@@ -107,82 +86,28 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
            adv_event_ms, est_throughput_kbps);
 }
 
-/* Attempt at new function using the upper and lower limits of the parameters, does not work as i want it to yet:{
-void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
-{
-    const uint8_t MIN_RESPONSE_SLOT_SPACING_UNITS = 2;   // 0.25 ms
-    const uint8_t MAX_RESPONSE_SLOT_SPACING_UNITS = 255; // 31.875 ms
-    const uint8_t MIN_SUBEVENT_INTERVAL_UNITS = 6;       // 7.5 ms
-    const uint8_t MAX_SUBEVENT_INTERVAL_UNITS = 255;     // 318.75 ms
-    const uint8_t MIN_PAWR_INTERVAL_UNITS = 40;          // 50 ms (40 * 1.25)
-    const uint8_t PHY_RATE_MBPS = 2;
-    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    const float SLOT_GUARD_TIME_MS = 0.5f;
-    const float ADVERTISER_GUARD_MS = 5.0f;
-    const float MARGIN_MS = 8.0f;
 
-    float best_throughput = 0;
-    uint8_t best_slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS;
-    uint8_t best_delay = MIN_SUBEVENT_INTERVAL_UNITS;
-    uint8_t best_subevent_interval = MIN_SUBEVENT_INTERVAL_UNITS;
-    uint16_t best_adv_interval_units = MIN_PAWR_INTERVAL_UNITS;
+/*
+Prøver å finne optimale parametre for 16 devices. Får sync feil...
 
-    // Sweep slot spacing and delay for best throughput
-    for (uint8_t slot_spacing = MIN_RESPONSE_SLOT_SPACING_UNITS; slot_spacing <= MAX_RESPONSE_SLOT_SPACING_UNITS; slot_spacing++) {
-        float slot_spacing_ms = slot_spacing * 0.125f;
-        float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000);
-        float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, slot_spacing_ms);
+void set_pawr_params_new(struct bt_le_per_adv_param *params){
+	params->interval_min = 0x20; //32*1.25ms = 40ms
+	params->interval_max = 0x20;
+	params->options = 0;
+	params->num_subevents = NUM_SUBEVENTS;
+	params->subevent_interval =  0x20; //40 ms
+	params->response_slot_delay = 0x06;  //7.5 ms
+	params->response_slot_spacing = 0x10;  // 16*0.125 ms = 2 ms
+	params->num_response_slots = NUM_RSP_SLOTS; 
 
-        for (uint8_t delay = MIN_SUBEVENT_INTERVAL_UNITS; delay <= 20; delay++) { // 20 units = 25 ms, reasonable upper bound
-            float delay_ms = delay * 1.25f;
-            float subevent_duration_ms = delay_ms + num_response_slots * slot_spacing_ms;
-            uint8_t subevent_interval_units = (uint8_t)ceilf(subevent_duration_ms / 1.25f);
-            if (subevent_interval_units < MIN_SUBEVENT_INTERVAL_UNITS || subevent_interval_units > MAX_SUBEVENT_INTERVAL_UNITS)
-                continue;
-
-            float total_event_time_ms = delay_ms + num_response_slots * slot_time_ms + ADVERTISER_GUARD_MS + MARGIN_MS;
-            uint16_t adv_interval_units = (uint16_t)ceilf(total_event_time_ms / 1.25f);
-            if (adv_interval_units < MIN_PAWR_INTERVAL_UNITS)
-                adv_interval_units = MIN_PAWR_INTERVAL_UNITS;
-
-            // Throughput in kbps
-            float throughput = (num_response_slots * packet_size * 8.0f) / (adv_interval_units * 1.25f);
-
-            if (throughput > best_throughput) {
-                best_throughput = throughput;
-                best_slot_spacing = slot_spacing;
-                best_delay = delay;
-                best_subevent_interval = subevent_interval_units;
-                best_adv_interval_units = adv_interval_units;
-            }
-        }
-    }
-
-    params->interval_min = best_adv_interval_units;
-    params->interval_max = best_adv_interval_units;
-    params->num_subevents = 1;
-    params->subevent_interval = best_subevent_interval;
-    params->response_slot_delay = best_delay;
-    params->response_slot_spacing = best_slot_spacing;
-    params->num_response_slots = num_response_slots;
-
-    uint32_t adv_event_ms = (uint32_t)(best_adv_interval_units * 1.25f);
-    uint32_t subevent_ms = (uint32_t)(best_subevent_interval * 1.25f);
-    uint32_t slot_ms_x100 = (uint32_t)(best_slot_spacing * 0.125f * 100);
-    uint32_t est_throughput_kbps = (uint32_t)best_throughput;
-
-    printk("PAwR config (auto):\n");
-    printk("  Devices: %d, Slot: %u.%02u ms, Delay: %u, SubEvt: %u ms\n",
-           num_response_slots, slot_ms_x100/100, slot_ms_x100%100, best_delay, subevent_ms);
-    printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
-           adv_event_ms, est_throughput_kbps);
 }
-*/
+  */
 
 static struct bt_le_per_adv_param per_adv_params;
 
 void init_adv_params(void) {
-	set_pawr_params(&per_adv_params,NUM_RSP_SLOTS);
+	set_pawr_params(&per_adv_params, NUM_RSP_SLOTS);
+	//set_pawr_params_new(&per_adv_params);
 }
 
 static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
