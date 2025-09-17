@@ -485,7 +485,7 @@ static uint8_t num_synced;
 
 static const struct bt_data ad_conn[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-    BT_DATA(BT_DATA_NAME_COMPLETE, "PAwR_Adv", 7),
+    BT_DATA(BT_DATA_NAME_COMPLETE, "PAwR_Adv", 8),
     /* Optionally: add UUIDs for your PAwR timing GATT service */
 };
 

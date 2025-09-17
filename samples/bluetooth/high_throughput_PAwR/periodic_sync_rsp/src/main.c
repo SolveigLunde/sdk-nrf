@@ -298,7 +298,7 @@ int main(void)
     printk("[SCAN] Scanning for '%s'...\n", TARGET_NAME);
 
      /* wait for connect signal from connected() */
-     if (k_sem_take(&sem_per_adv, K_SECONDS(20)) != 0) {
+     if (k_sem_take(&sem_per_adv, K_SECONDS(20))) {
         printk("[MAIN] Timeout waiting for connection (no advertiser found)\n");
         return 0;
     }
