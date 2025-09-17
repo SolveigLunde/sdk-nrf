@@ -28,12 +28,54 @@
 #define PACKET_SIZE   251
 #define NAME_LEN      30
 
-#define MAX_INDIVIDUAL_RESPONSE_SIZE 247
+//#define MAX_INDIVIDUAL_RESPONSE_SIZE 247
+#define SYNC_RSP_SIZE 232  // Optimal size for 1.25ms slot alignment
 #define THROUGHPUT_PRINT_INTERVAL 1000 
+#define UNIT_MS 1.25
 
 static uint32_t total_bytes;
 static uint64_t stamp;
+/*
+void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots) {
+    // Fixed optimal values that don't depend on number of devices
+    const uint8_t RSP_DELAY = 1;          // Always use minimum 1.25ms delay
+    const uint8_t SLOT_SPACING = 9;       // Optimal 1.125ms per slot (9 * 0.125ms)
+    
+    // Calculate total time needed in milliseconds:
+    // needed_ms = initial_delay + (num_devices * slot_time)
+    // = 1.25ms + (num_devices * 1.125ms)
+    //float needed_ms = 1.25f + (num_response_slots * 1.125f);
+    
+    // Convert to 1.25ms units, rounding up
 
+
+	uint16_t min_units = (uint16_t)(1 + (9u * num_response_slots + 9u) / 10u);
+	uint8_t interval_units = (min_units < 6 ? 6 : min_units);
+
+	interval_units += 1;
+    
+    // Set parameters
+    params->interval_min = interval_units;
+    params->interval_max = interval_units;
+    params->num_subevents = 1;
+    params->subevent_interval = interval_units;
+    params->response_slot_delay = RSP_DELAY;
+    params->response_slot_spacing = SLOT_SPACING;
+    params->num_response_slots = num_response_slots;
+
+    // Calculate and print throughput statistics
+    uint32_t throughput_kbps = (uint32_t)((num_response_slots * SYNC_RSP_SIZE * 8.0f * 1000.0f) / 
+                                         (interval_units * 1.25f)) / 1000;
+
+    printk("PAwR Config for %d devices:\n", num_response_slots);
+    printk("  Packet Size: %d bytes\n", SYNC_RSP_SIZE);
+    printk("  Response Slot: 1.125 ms (9 * 0.125ms)\n");
+    printk("  Initial Delay: 1.25 ms (1 * 1.25ms)\n");
+    printk("  Total Time: %.2f ms (%d * 1.25ms)\n", (uint32_t)(interval_units * 1.25f), interval_units);
+    printk("  Est. Throughput: %d kbps\n", throughput_kbps);
+}
+*/
+/*
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
     const uint8_t MIN_PAWR_INTERVAL_MS = 50;          
@@ -83,29 +125,34 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
            adv_event_ms, est_throughput_kbps);
 }
+*/
 
-
-/*
-Prøver å finne optimale parametre for 16 devices. Får sync feil...
 
 void set_pawr_params_new(struct bt_le_per_adv_param *params){
-	params->interval_min = 0x20; //32*1.25ms = 40ms
-	params->interval_max = 0x20;
+
+
+	uint16_t min_units = (uint16_t)(1 + (9 * NUM_RSP_SLOTS + 9) / 10);
+	uint8_t interval_units = (min_units < 6 ? 6 : min_units);
+
+	interval_units += 1;
+
+	params->interval_min = interval_units;
+	params->interval_max = interval_units;
 	params->options = 0;
 	params->num_subevents = NUM_SUBEVENTS;
-	params->subevent_interval =  0x20; //40 ms
-	params->response_slot_delay = 0x06;  //7.5 ms
-	params->response_slot_spacing = 0x10;  // 16*0.125 ms = 2 ms
+	params->subevent_interval =  interval_units; 
+	params->response_slot_delay = 0x01;  
+	params->response_slot_spacing = 9;
 	params->num_response_slots = NUM_RSP_SLOTS; 
 
 }
-  */
+
 
 static struct bt_le_per_adv_param per_adv_params;
 
 void init_adv_params(void) {
-	set_pawr_params(&per_adv_params, NUM_RSP_SLOTS);
-	//set_pawr_params_new(&per_adv_params);
+	//set_pawr_params(&per_adv_params, NUM_RSP_SLOTS);
+	set_pawr_params_new(&per_adv_params);
 }
 
 static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
@@ -261,11 +308,12 @@ void connected_cb(struct bt_conn *conn, uint8_t err)
 
 	__ASSERT(conn == default_conn, "Unexpected connected callback");
 
-	if (err) {
+	if (err != 0) {
 		bt_conn_unref(default_conn);
 		default_conn = NULL;
 		return;
 	}
+
 	struct bt_conn_le_phy_param phy_param = {
 		.options = BT_CONN_LE_PHY_OPT_NONE,
 		.pref_tx_phy = BT_GAP_LE_PHY_2M,
@@ -290,6 +338,7 @@ void disconnected_cb(struct bt_conn *conn, uint8_t reason)
 void remote_info_available_cb(struct bt_conn *conn, struct bt_conn_remote_info *remote_info)
 {
 	/* Need to wait for remote info before initiating PAST */
+	printk("Remote info avaliable \n");
 	k_sem_give(&sem_connected);
 }
 
@@ -344,7 +393,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	(void)memset(name, 0, sizeof(name));
 	bt_data_parse(ad, data_cb, name);
 
-	if (strcmp(name, "PAwR sync sample")) {
+	if (strcmp(name, "PAwR_Adv")) {
 		return;
 	}
 
@@ -356,6 +405,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	if (err) {
 		printk("Create conn to %s failed (%u)\n", addr_str, err);
 	}
+	
 }
 
 
@@ -368,26 +418,34 @@ static uint8_t discover_func(struct bt_conn *conn, const struct bt_gatt_attr *at
 	struct bt_gatt_chrc *chrc;
 	char str[BT_UUID_STR_LEN];
 
-	printk("Discovery: attr %p\n", attr);
+	printk("[GATT] Discovery callback with attr: %p\n", attr);
 
 	if (!attr) {
+		printk("[GATT] No more attributes, discovery complete\n");
 		return BT_GATT_ITER_STOP;
+	}
+
+	if (!attr->user_data) {
+		printk("[GATT] Attribute has no user data\n");
+		return BT_GATT_ITER_CONTINUE;
 	}
 
 	chrc = (struct bt_gatt_chrc *)attr->user_data;
 
 	bt_uuid_to_str(chrc->uuid, str, sizeof(str));
-	printk("UUID %s\n", str);
+	printk("[GATT] Found characteristic with UUID: %s\n", str);
+	printk("[GATT] Properties: 0x%02X, Value Handle: %d\n", 
+		chrc->properties, chrc->value_handle);
 
 	if (!bt_uuid_cmp(chrc->uuid, &pawr_char_uuid.uuid)) {
 		pawr_attr_handle = chrc->value_handle;
-
-		printk("Characteristic handle: %d\n", pawr_attr_handle);
-
+		printk("[GATT] Found PAwR characteristic! Handle: %d\n", pawr_attr_handle);
 		k_sem_give(&sem_discovered);
+		return BT_GATT_ITER_STOP;
 	}
 
-	return BT_GATT_ITER_STOP;
+	printk("[GATT] Not our characteristic, continuing...\n");
+	return BT_GATT_ITER_CONTINUE;
 }
 
 static void write_func(struct bt_conn *conn, uint8_t err, struct bt_gatt_write_params *params)
@@ -425,10 +483,19 @@ struct pawr_timing {
 
 static uint8_t num_synced;
 
+static const struct bt_data ad_conn[] = {
+    BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+    BT_DATA(BT_DATA_NAME_COMPLETE, "PAwR_Adv", 7),
+    /* Optionally: add UUIDs for your PAwR timing GATT service */
+};
+
+static const uint8_t pawr_payload[] = {0x01, 0x02, 0x03, 0x04};
+
 int main(void)
 {
 	int err;
 	struct bt_le_ext_adv *pawr_adv;
+	struct bt_le_ext_adv *adv_conn;
 	struct bt_gatt_discover_params discover_params;
 	struct bt_gatt_write_params write_params;
 	struct pawr_timing sync_config;
@@ -448,6 +515,19 @@ int main(void)
 	printk("Bluetooth initialized\n");
 
 	init_adv_params();
+	/* Connectable adv set for GATT/PAST handshake */
+	err = bt_le_ext_adv_create(BT_LE_EXT_ADV_CONN, NULL, &adv_conn);
+	if (err) {
+		printk("Failed to create connectable advertising set (err %d)\n", err);
+		return 0;
+	}
+
+	/* set advertising data for the connectable set (e.g. local name or service UUIDs) */
+	err = bt_le_ext_adv_set_data(adv_conn, ad_conn, ARRAY_SIZE(ad_conn), NULL, 0);
+	if (err) {
+		printk("Failed to set connectable adv data (err %d)\n", err);
+	}
+
 
 	/* Create a non-connectable advertising set */
 	err = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN, &adv_cb, &pawr_adv);
@@ -463,18 +543,31 @@ int main(void)
 		return 0;
 	}
 
+	printk("Start Extended Advertising\n");
+	err = bt_le_ext_adv_start(pawr_adv, BT_LE_EXT_ADV_START_DEFAULT);
+	if (err) {
+		printk("Failed to start extended advertising (err %d)\n", err);
+		return 0;
+	}
+
+	err = bt_le_per_adv_set_data(pawr_adv, (struct bt_data[]){BT_DATA(BT_DATA_MANUFACTURER_DATA, pawr_payload, sizeof(pawr_payload))}, 1);
+	if (err){
+		printk("Failed to set per adv data (err %d) \n", err);
+		return 0;
+	}
+
+	printk("Start connectable advertising \n");
+	err = bt_le_per_adv_start(adv_conn);
+	if (err) {
+		printk("Failed to enable connectable periodic advertising (err %d)\n", err);
+		return 0;
+	}
+
 	/* Enable Periodic Advertising */
 	printk("Start Periodic Advertising\n");
 	err = bt_le_per_adv_start(pawr_adv);
 	if (err) {
 		printk("Failed to enable periodic advertising (err %d)\n", err);
-		return 0;
-	}
-
-	printk("Start Extended Advertising\n");
-	err = bt_le_ext_adv_start(pawr_adv, BT_LE_EXT_ADV_START_DEFAULT);
-	if (err) {
-		printk("Failed to start extended advertising (err %d)\n", err);
 		return 0;
 	}
 
@@ -498,32 +591,56 @@ int main(void)
 			goto disconnected;
 		}
 
+		printk("[PAST] Initiating PAST transfer...\n");
 		err = bt_le_per_adv_set_info_transfer(pawr_adv, default_conn, 0);
 		if (err) {
-			printk("Failed to send PAST (err %d)\n", err);
+			printk("[PAST] Failed to send PAST (err %d)\n", err);
+			if (err == -EINVAL) {
+				printk("[PAST] Error: Invalid parameters\n");
+			} else if (err == -ENOTCONN) {
+				printk("[PAST] Error: Connection lost\n");
+			} else if (err == -EBUSY) {
+				printk("[PAST] Error: Controller busy\n");
+			}
 
 			goto disconnect;
 		}
-		printk("PAST sent\n");
+		printk("[PAST] Transfer initiated successfully\n");
 
+		printk("[GATT] Starting characteristic discovery...\n");
 		discover_params.uuid = &pawr_char_uuid.uuid;
 		discover_params.func = discover_func;
 		discover_params.start_handle = BT_ATT_FIRST_ATTRIBUTE_HANDLE;
 		discover_params.end_handle = BT_ATT_LAST_ATTRIBUTE_HANDLE;
 		discover_params.type = BT_GATT_DISCOVER_CHARACTERISTIC;
 
+		printk("[GATT] Looking for UUID: ");
+		char uuid_str[BT_UUID_STR_LEN];
+		bt_uuid_to_str(&pawr_char_uuid.uuid, uuid_str, sizeof(uuid_str));
+		printk("%s\n", uuid_str);
+
 		err = bt_gatt_discover(default_conn, &discover_params);
 		if (err) {
-			printk("Discovery failed (err %d)\n", err);
+			printk("[GATT] Discovery failed to start (err %d)\n", err);
+			if (err == -EINVAL) {
+				printk("[GATT] Invalid parameters\n");
+			} else if (err == -ENOTCONN) {
+				printk("[GATT] Not connected\n");
+			} else if (err == -EALREADY) {
+				printk("[GATT] Discovery already in progress\n");
+			}
 			goto disconnect;
 		}
-		printk("Discovery started\n");
+		printk("[GATT] Discovery procedure started successfully\n");
 
+		printk("[GATT] Waiting for discovery to complete (timeout: 10s)...\n");
 		err = k_sem_take(&sem_discovered, K_SECONDS(10));
 		if (err) {
-			printk("Timed out during GATT discovery\n");
+			printk("[GATT] ERROR: Discovery timed out after 10 seconds!\n");
+			printk("[GATT] Last known state: Discovery started but no callback received\n");
 			goto disconnect;
 		}
+		printk("[GATT] Discovery completed successfully\n");
 
 		sync_config.subevent = 0; 
 		sync_config.response_slot = num_synced;  
@@ -573,6 +690,7 @@ disconnected:
 	}
 
 	printk("Maximum numnber of syncs onboarded\n");
+	
 
 	while (true) {
 		k_sleep(K_SECONDS(1));
