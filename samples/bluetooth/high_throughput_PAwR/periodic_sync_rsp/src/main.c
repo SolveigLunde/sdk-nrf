@@ -13,7 +13,7 @@
 #include <zephyr/kernel.h>
  
 #define NAME_LEN 30
-//efine MAX_INDIVIDUAL_RESPONSE_SIZE 247 
+//define MAX_INDIVIDUAL_RESPONSE_SIZE 247 
 static uint16_t rsp_size = 232;
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
@@ -30,17 +30,46 @@ static struct __packed {
     uint16_t total_devices;
 } pawr_timing;
 
-static void sync_cb(struct bt_le_per_adv_sync *sync, 
-                struct bt_le_per_adv_sync_synced_info *info)
+static bool have_pending_filter;
+static uint8_t pending_subevent;
+
+static void apply_subevent_filter_if_ready(void)
+{
+    if (!default_sync || !have_pending_filter) {
+        return;
+    }
+
+    struct bt_le_per_adv_sync_subevent_params params;
+    uint8_t subevents[1];
+    params.properties   = 0;
+    params.num_subevents = 1;
+    params.subevents     = subevents;
+    subevents[0]         = pending_subevent;
+
+    int err = bt_le_per_adv_sync_subevent(default_sync, &params);
+    if (err) {
+        printk("[TIMING] set subevents failed (err %d)\n", err);
+    } else {
+        printk("[TIMING] subevent filter applied: %u\n", pending_subevent);
+        have_pending_filter = false; /* done */
+    }
+}
+
+
+static void sync_cb(struct bt_le_per_adv_sync *sync,
+    struct bt_le_per_adv_sync_synced_info *info)
 {
     char le_addr[BT_ADDR_LE_STR_LEN];
-
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-    printk("[SYNC]Synced to %s with %d subevents\n", le_addr, info->num_subevents);
 
-    // Store the sync handle but don't configure subevents yet
-    // We'll do that after receiving timing configuration via GATT
+    printk("[SYNC] Synced to %s: sid=%u, interval=%u*1.25ms, subevents=%u\n",
+    le_addr, info->sid, info->interval, info->num_subevents);
+
     default_sync = sync;
+
+    /* Now we have a handle → apply any pending subevent filter */
+    apply_subevent_filter_if_ready();
+
     k_sem_give(&sem_per_sync);
 }
 
@@ -113,7 +142,7 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
             printk("Successfully sent %d bytes of response data on slot %d\n", rsp_size, pawr_timing.response_slot);
         }
     } else {
-        printk("Failed to receive on subevent %d\n", info->subevent);
+        //printk("Failed to receive on subevent %d\n", info->subevent);
     }
 }
 
@@ -128,36 +157,27 @@ static const struct bt_uuid_128 pawr_svc_uuid =
 static const struct bt_uuid_128 pawr_char_uuid =
     BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1));
 
-static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *attr, const void *buf,
-                uint16_t len, uint16_t offset, uint8_t flags)
+static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *attr,
+        const void *buf, uint16_t len, uint16_t offset, uint8_t flags)
 {
     if (offset) {
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
+    return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
-
     if (len != sizeof(pawr_timing)) {
-        return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
+    return BT_GATT_ERR(BT_ATT_ERR_INVALID_ATTRIBUTE_LEN);
     }
 
     memcpy(&pawr_timing, buf, len);
 
-    struct bt_le_per_adv_sync_subevent_params params;
-    uint8_t subevents[1];
-    int err;
+    /* Just cache the subevent. We’ll apply it once we *have* a sync handle. */
+    pending_subevent     = pawr_timing.subevent;
+    have_pending_filter  = true;
 
-    params.properties = 0;
-    params.num_subevents = 1;
-    params.subevents = subevents;
-    subevents[0] = pawr_timing.subevent;
+    /* If we already synced (e.g., re-PAST path), apply now. */
+    apply_subevent_filter_if_ready();
 
-    if (default_sync) {
-        // Add a small delay before configuring subevents
-        k_sleep(K_MSEC(10));
-        err = bt_le_per_adv_sync_subevent(default_sync, &params);
-        if (err) {
-            printk("[TIMING] Error: Failed to set subevents (err %d)\n", err);
-        }
-    }
+    printk("[TIMING] got timing: subevent=%u, slot=%u, total=%u\n",
+    pawr_timing.subevent, pawr_timing.response_slot, pawr_timing.total_devices);
 
     return len;
 }
@@ -167,43 +187,52 @@ BT_GATT_SERVICE_DEFINE(pawr_svc, BT_GATT_PRIMARY_SERVICE(&pawr_svc_uuid.uuid),
                         BT_GATT_PERM_WRITE, NULL, write_timing,
                         &pawr_timing));
 
+
 static void connected(struct bt_conn *conn, uint8_t err)
 {
     if (err) {
         printk("[SYNC]Failed to connect (err 0x%02X)\n", err);
         default_conn = NULL;
-        is_syncing = false;  // Reset syncing state on connection failure
+        is_syncing = false;
         return;
     }
 
-    is_syncing = true;  // Mark that we're in the syncing process
+    is_syncing = true;
     default_conn = bt_conn_ref(conn);
 
     /* Accept 2M PHY if requested */
     struct bt_conn_le_phy_param phy_param = {
-        .options = BT_CONN_LE_PHY_OPT_NONE,
+        .options   = BT_CONN_LE_PHY_OPT_NONE,
         .pref_tx_phy = BT_GAP_LE_PHY_2M,
         .pref_rx_phy = BT_GAP_LE_PHY_2M,
     };
-    
-    err = bt_conn_le_phy_update(conn, &phy_param);
-    if (err) {
-        printk("[SYNC] PHY update request failed (err %d)\n", err);
+    int perr = bt_conn_le_phy_update(conn, &phy_param);
+    if (perr) {
+        printk("[SYNC] PHY update request failed (err %d)\n", perr);
     } else {
         printk("[SYNC] PHY update request sent\n");
     }
+
+    /* ❌ REMOVE this (do not subscribe per-connection):
+        struct bt_le_per_adv_sync_transfer_param past_param = {...};
+        bt_le_per_adv_sync_transfer_subscribe(conn, &past_param);
+        printk("[PAST] subscribe on conn OK\n");
+    */
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    bt_conn_unref(default_conn);
-    default_conn = NULL;
-    
-    // Only reset syncing state if we haven't successfully synced
-    if (!default_sync) {
-        is_syncing = false;
+    if (default_conn) {
+        bt_conn_unref(default_conn);
+        default_conn = NULL;
     }
+
+    if (!default_sync) {
+        is_syncing = false;   /* let main loop try again */
+    }
+    printk("[SYNC] Disconnected (0x%02X)\n", reason);
 }
+
 
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -217,7 +246,6 @@ static const struct bt_data ad[] = {
 
 int main(void)
 {
-    struct bt_le_per_adv_sync_transfer_param past_param;
     int err;
 
     printk("Starting PAwR Synchronizer\n");
@@ -230,38 +258,41 @@ int main(void)
 
     bt_le_per_adv_sync_cb_register(&sync_callbacks);
 
-    past_param.skip = 1;
-    past_param.timeout = 1000; /* 10 seconds */
-    past_param.options = BT_LE_PER_ADV_SYNC_TRANSFER_OPT_NONE;
+    struct bt_le_per_adv_sync_transfer_param past_param = {
+        .skip    = 0,       /* don’t skip PA reports */
+        .timeout = 2000,    /* 20.00 s (units are 10 ms) */
+        .options = BT_LE_PER_ADV_SYNC_TRANSFER_OPT_NONE,
+    };
     err = bt_le_per_adv_sync_transfer_subscribe(NULL, &past_param);
     if (err) {
-        printk("[INIT] Error: PAST subscribe failed (err %d)\n", err);
+        printk("[INIT] PAST global subscribe failed (err %d)\n", err);
         return 0;
     }
+    printk("[INIT] PAST global subscribe OK\n");
+
+    /* Register PAwR sync lifecycle callbacks (these you already have) */
+    //bt_le_per_adv_sync_cb_register(&sync_callbacks);
+
+    /* NOTE: do NOT call bt_le_per_adv_sync_transfer_cb_register();
+       that API is not present in your tree and isn't needed. */
 
     do {
-        // Make sure we're in a clean state
         if (is_syncing && !default_conn && !default_sync) {
-            is_syncing = false;  // Reset state if we're marked as syncing but have no connection or sync
+            is_syncing = false;
         }
 
-        // Only try to advertise if we're not already syncing
         if (!is_syncing) {
-            // Stop any existing advertising first
-            bt_le_adv_stop();
-            
+            (void)bt_le_adv_stop();
+
             err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
             if (err) {
                 if (err == -EALREADY) {
-                    // Already advertising, wait briefly
                     k_sleep(K_MSEC(10));
                     continue;
                 } else if (err == -ENOMEM) {
-                    // System is busy with other devices, wait quietly
                     k_sleep(K_MSEC(500));
                     continue;
                 } else {
-                    // Real error - log it
                     printk("[ADV] Error: Failed to start (err %d)\n", err);
                     k_sleep(K_MSEC(100));
                     continue;
@@ -270,17 +301,15 @@ int main(void)
         }
 
         printk("[SYNC] Waiting for sync...\n");
-        
-        // Wait for sync with timeout
-        err = k_sem_take(&sem_per_sync, K_SECONDS(10));
+        err = k_sem_take(&sem_per_sync, K_SECONDS(20));  // was 10; make it 20 initially
         if (err) {
-            //printk("[SYNC] Timeout waiting for sync\n");
-            is_syncing = false;  // Reset state on timeout
-            k_sleep(K_MSEC(100));  // Brief pause before retry
+            is_syncing = false;
+            k_sleep(K_MSEC(100));
             continue;
         }
 
-        // Wait for sync to be lost (happens when we disconnect or lose sync)
+
+        /* Stay in data phase until sync is lost/terminated */
         err = k_sem_take(&sem_per_sync_lost, K_FOREVER);
         if (err) {
             printk("[SYNC] Error: Failed (err %d)\n", err);
