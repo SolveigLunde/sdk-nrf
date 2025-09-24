@@ -28,104 +28,13 @@
 #define PACKET_SIZE   251
 #define NAME_LEN      30
 
-//#define MAX_INDIVIDUAL_RESPONSE_SIZE 247
 #define SYNC_RSP_SIZE 232  // Optimal size for 1.25ms slot alignment
 #define THROUGHPUT_PRINT_INTERVAL 1000 
 #define UNIT_MS 1.25
 
 static uint32_t total_bytes;
 static uint64_t stamp;
-/*
-void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots) {
-    // Fixed optimal values that don't depend on number of devices
-    const uint8_t RSP_DELAY = 1;          // Always use minimum 1.25ms delay
-    const uint8_t SLOT_SPACING = 9;       // Optimal 1.125ms per slot (9 * 0.125ms)
-    
-    // Calculate total time needed in milliseconds:
-    // needed_ms = initial_delay + (num_devices * slot_time)
-    // = 1.25ms + (num_devices * 1.125ms)
-    //float needed_ms = 1.25f + (num_response_slots * 1.125f);
-    
-    // Convert to 1.25ms units, rounding up
 
-
-	uint16_t min_units = (uint16_t)(1 + (9u * num_response_slots + 9u) / 10u);
-	uint8_t interval_units = (min_units < 6 ? 6 : min_units);
-
-	interval_units += 1;
-    
-    // Set parameters
-    params->interval_min = interval_units;
-    params->interval_max = interval_units;
-    params->num_subevents = 1;
-    params->subevent_interval = interval_units;
-    params->response_slot_delay = RSP_DELAY;
-    params->response_slot_spacing = SLOT_SPACING;
-    params->num_response_slots = num_response_slots;
-
-    // Calculate and print throughput statistics
-    uint32_t throughput_kbps = (uint32_t)((num_response_slots * SYNC_RSP_SIZE * 8.0f * 1000.0f) / 
-                                         (interval_units * 1.25f)) / 1000;
-
-    printk("PAwR Config for %d devices:\n", num_response_slots);
-    printk("  Packet Size: %d bytes\n", SYNC_RSP_SIZE);
-    printk("  Response Slot: 1.125 ms (9 * 0.125ms)\n");
-    printk("  Initial Delay: 1.25 ms (1 * 1.25ms)\n");
-    printk("  Total Time: %.2f ms (%d * 1.25ms)\n", (uint32_t)(interval_units * 1.25f), interval_units);
-    printk("  Est. Throughput: %d kbps\n", throughput_kbps);
-}
-*/
-/*
-void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
-{
-    const uint8_t MIN_PAWR_INTERVAL_MS = 50;          
-    const float MARGIN_MS = 8.0f;                 
-    const float ADVERTISER_GUARD_MS = 5.0f;           
-    const uint8_t PHY_RATE_MBPS = 2;                  
-    const float SLOT_GUARD_TIME_MS = 0.5f;
-	uint8_t delay = 6;     
-    
-    uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
-    
-    float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000); 
-    float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);  
-
-    uint8_t slot_spacing = (uint8_t)((slot_time_ms + 0.124f) / 0.125f);
-    if (slot_spacing < 8) slot_spacing = 8;  
-
-
-    float subevent_duration_ms = delay * 1.25f + num_response_slots * (slot_spacing * 0.125f);
-
-    float total_event_time_ms = (delay * 1.25f) + (num_response_slots * slot_time_ms) + ADVERTISER_GUARD_MS + MARGIN_MS;
-
-    uint16_t subevent_interval_units = (uint16_t)ceilf(subevent_duration_ms / 1.25f);
-    
-    uint16_t min_interval_units = (uint16_t)ceilf(MIN_PAWR_INTERVAL_MS / 1.25f);
-    uint16_t required_interval_units = (uint16_t)ceilf(total_event_time_ms / 1.25f);
-    uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units) ? 
-                                               required_interval_units : min_interval_units;
-
-    params->interval_min = advertising_event_interval_units;
-    params->interval_max = advertising_event_interval_units;
-    params->num_subevents = 1;
-    params->subevent_interval = subevent_interval_units;
-    params->response_slot_delay = delay;
-    params->response_slot_spacing = slot_spacing;
-    params->num_response_slots = num_response_slots;
-
-    uint32_t adv_event_ms = (uint32_t)(advertising_event_interval_units * 1.25f);
-    uint32_t subevent_ms = (uint32_t)(subevent_interval_units * 1.25f);
-    uint32_t slot_ms_x100 = (uint32_t)(slot_spacing * 0.125f * 100);
-    uint32_t est_throughput_kbps = (uint32_t)((num_response_slots * packet_size * 8ULL * 1000ULL) / 
-                                             (advertising_event_interval_units * 1.25f)) / 1000;
-
-    printk("PAwR config:\n");
-    printk("  Devices: %d, Slot: %u.%02u ms, Delay: %u, SubEvt: %u ms\n",
-           num_response_slots, slot_ms_x100/100, slot_ms_x100%100, delay, subevent_ms);
-    printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
-           adv_event_ms, est_throughput_kbps);
-}
-*/
 
 
 void set_pawr_params_new(struct bt_le_per_adv_param *params){

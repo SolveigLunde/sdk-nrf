@@ -13,7 +13,6 @@
 
 #define NAME_LEN 30
 #define TARGET_NAME "PAwR_Adv"
-//#define MAX_INDIVIDUAL_RESPONSE_SIZE 247 
 static uint16_t rsp_size = 232;
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
