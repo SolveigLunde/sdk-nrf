@@ -4,6 +4,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
+// -----------------------Synchroniser code ---------------------------
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -13,8 +14,10 @@
 #include <zephyr/kernel.h>
  
 #define NAME_LEN 30
-//define MAX_INDIVIDUAL_RESPONSE_SIZE 247 
-static uint16_t rsp_size = 232;
+#ifndef BT_LE_PER_ADV_SYNC_SUBEVENT_PARAMS_ENABLE_RESPONSE
+#define BT_LE_PER_ADV_SYNC_SUBEVENT_PARAMS_ENABLE_RESPONSE BIT(0)
+#endif
+static uint16_t rsp_size = 16; //232
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
@@ -40,18 +43,20 @@ static void apply_subevent_filter_if_ready(void)
     }
 
     struct bt_le_per_adv_sync_subevent_params params;
-    uint8_t subevents[1];
-    params.properties   = 0;
+    uint8_t subevents[1] = {pending_subevent};
+    params.properties   = BT_LE_PER_ADV_SYNC_SUBEVENT_PARAMS_ENABLE_RESPONSE;
     params.num_subevents = 1;
     params.subevents     = subevents;
-    subevents[0]         = pending_subevent;
+    //subevents[0]         = pending_subevent;
 
-    int err = bt_le_per_adv_sync_subevent(default_sync, &params);
+    if(have_pending_filter){
+        int err = bt_le_per_adv_sync_subevent(default_sync, &params);
     if (err) {
         printk("[TIMING] set subevents failed (err %d)\n", err);
     } else {
         printk("[TIMING] subevent filter applied: %u\n", pending_subevent);
         have_pending_filter = false; /* done */
+    }
     }
 }
 
@@ -62,8 +67,9 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     char le_addr[BT_ADDR_LE_STR_LEN];
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
 
-    printk("[SYNC] Synced to %s: sid=%u, interval=%u*1.25ms, subevents=%u\n",
-    le_addr, info->sid, info->interval, info->num_subevents);
+    //printk("[SYNC] Synced to %s: sid=%u, interval=%u*1.25ms, subevents=%u\n", le_addr, info->sid, info->interval, info->num_subevents);
+    printk("[SYNC] Synced cb (sync=%p) to %s: sid=%u, interval=%u*1.25ms, subevents=%u, addr_type=%u\n",
+            sync, le_addr, info->sid, info->interval, info->num_subevents, info->addr->type);
 
     default_sync = sync;
 
@@ -95,7 +101,12 @@ NET_BUF_SIMPLE_DEFINE_STATIC(rsp_buf, 260);
 static void recv_cb(struct bt_le_per_adv_sync *sync,
                 const struct bt_le_per_adv_sync_recv_info *info,
                 struct net_buf_simple *buf)
-{
+{   
+    if (info) {
+        printk("[RECV] period_event=%u subevent=%u sid=%u rssi=%d\n",
+               info->periodic_event_counter, info->subevent, info->sid, info->rssi);
+    }
+
     int err;
 
     if (buf && buf->len) {
@@ -257,6 +268,7 @@ int main(void)
     }
 
     bt_le_per_adv_sync_cb_register(&sync_callbacks);
+    printk("[INIT] Per-adv sync callbacks registered\n");
 
     struct bt_le_per_adv_sync_transfer_param past_param = {
         .skip    = 0,       /* don’t skip PA reports */
@@ -303,6 +315,7 @@ int main(void)
         printk("[SYNC] Waiting for sync...\n");
         err = k_sem_take(&sem_per_sync, K_SECONDS(20));  // was 10; make it 20 initially
         if (err) {
+            printk("[SYNC] sem_per_sync timed out after 20s\n");  
             is_syncing = false;
             k_sleep(K_MSEC(100));
             continue;
@@ -311,6 +324,7 @@ int main(void)
 
         /* Stay in data phase until sync is lost/terminated */
         err = k_sem_take(&sem_per_sync_lost, K_FOREVER);
+        printk("[SYNC] Data phase, have locked semaphore\n");
         if (err) {
             printk("[SYNC] Error: Failed (err %d)\n", err);
             return 0;

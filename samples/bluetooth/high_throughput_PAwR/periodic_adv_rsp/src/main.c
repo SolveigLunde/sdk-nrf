@@ -4,6 +4,7 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 
+// ---------------------Advertisier code-----------------------------
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -233,7 +234,7 @@ static struct bt_conn *default_conn;
 void connected_cb(struct bt_conn *conn, uint8_t err)
 {
     printk("[DEBUG] Connected callback called (err 0x%02X)\n", err);
-    __ASSERT(conn == default_conn, "Unexpected connected callback");
+    //__ASSERT(conn == default_conn, "Unexpected connected callback");
 
     if (err) {
         printk("[DEBUG] Connection failed with error, cleaning up\n");
@@ -241,16 +242,21 @@ void connected_cb(struct bt_conn *conn, uint8_t err)
         default_conn = NULL;
         return;
     }
-
     printk("[DEBUG] Connection successful, waiting for remote info...\n");
+    k_sem_give(&sem_connected);
+    printk("[DEBUG] Give up sem_connected.\n");
+
     struct bt_conn_le_phy_param phy_param = {
         .options    = BT_CONN_LE_PHY_OPT_NONE,
         .pref_tx_phy = BT_GAP_LE_PHY_2M,
         .pref_rx_phy = BT_GAP_LE_PHY_2M,
     };
     int perr = bt_conn_le_phy_update(conn, &phy_param);
-    if (perr) printk("PHY update request failed (err %d)\n", perr);
-    else      printk("PHY update request sent\n");
+    if (perr) {
+        printk("PHY update request failed (err %d)\n", perr);
+    }else{
+        printk("PHY update request sent\n");
+    }
 }
 
 void disconnected_cb(struct bt_conn *conn, uint8_t reason)
@@ -415,18 +421,27 @@ int main(void)
     printk("====================================\n");
 
     err = bt_enable(NULL);
-    if (err) { printk("Bluetooth init failed (%d)\n", err); return 0; }
+    if (err) { 
+        printk("Bluetooth init failed (%d)\n", err); 
+        return 0; 
+    }
     printk("Bluetooth initialized\n");
 
     reset_prov_sems();
 
     /* Create PAwR advertising set (EXT adv + periodic arm) */
     err = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN, &adv_cb, &adv_pawr);
-    if (err) { printk("Failed to create adv (pawr) err %d\n", err); return 0; }
+    if (err) { 
+        printk("Failed to create adv (pawr) err %d\n", err); 
+        return 0; 
+    }
 
     /* Start EXTENDED ADV now; lenient periodic will be started below */
     err = bt_le_ext_adv_start(adv_pawr, BT_LE_EXT_ADV_START_DEFAULT);
-    if (err) { printk("Failed to start EXT adv (pawr) err %d\n", err); return 0; }
+    if (err) { 
+        printk("Failed to start EXT adv (pawr) err %d\n", err); 
+        return 0; 
+    }
     printk("PAwR EXT adv is up\n");
 
     /* Lenient periodic arm ON during provisioning */
@@ -436,25 +451,39 @@ int main(void)
     g_active_bitmap_bytes = 1;
     reset_bitmaps_for(g_active_num_slots);
 
+	printk("[ADV] regular periodic interval = %u units (~%u ms) \n", per_adv_params.interval_max, per_adv_params.interval_max * 5/4);
     err = bt_le_per_adv_set_param(adv_pawr, &per_lenient);
-    if (err) { printk("Failed to set periodic (lenient) err %d\n", err); return 0; }
+    if (err) { 
+        printk("Failed to set periodic (lenient) err %d\n", err); 
+        return 0; 
+    }
     err = bt_le_per_adv_start(adv_pawr);
-    if (err) { printk("Failed to start periodic (lenient) err %d\n", err); return 0; }
+    if (err) { 
+        printk("Failed to start periodic (lenient) err %d\n", err); 
+        return 0; 
+    }
     printk("Periodic (lenient) up; PAST is valid\n");
 
     /* Optional connectable set (not required if we initiate) */
     err = bt_le_ext_adv_create(BT_LE_EXT_ADV_CONN, NULL, &adv_conn);
     if (!err) {
         err = bt_le_ext_adv_start(adv_conn, BT_LE_EXT_ADV_START_DEFAULT);
-        if (err) printk("ext adv start (conn) err %d\n", err);
-        else     printk("Connectable adv (provisioning) up\n");
+        if (err) {
+            printk("ext adv start (conn) err %d\n", err);
+        } else {
+            printk("Connectable adv (provisioning) up\n");
+        }
     }
+
 
     /* --------- Provisioning loop --------- */
     while (num_synced < CONFIG_BT_MAX_THROUGHPUT_DEVICES) {
         k_sleep(K_MSEC(5)); /* avoid BSIM churn */
         err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, device_found);
-        if (err) { printk("scan start err %d\n", err); break; }
+        if (err) { 
+            printk("scan start err %d\n", err); 
+            break; 
+        }
         printk("Scanning started\n");
 
         if (k_sem_take(&sem_connected, K_SECONDS(10))) {
@@ -466,13 +495,7 @@ int main(void)
         (void)bt_le_scan_stop();
     
 
-        /* PAST: point the connection to our (lenient) periodic */
-        err = bt_le_per_adv_set_info_transfer(adv_pawr, default_conn, 0);
-        if (err) {
-            printk("[PAST] transfer err %d\n", err);
-            goto disconnect;
-        }
-        printk("[PAST] OK\n");
+        printk("[PROV] provisioning (no PAST during this phase)\n");
 
         /* GATT: discover PAwR characteristic and write slot assignment */
         memset(&discover_params, 0, sizeof(discover_params));
@@ -484,8 +507,12 @@ int main(void)
 
         k_sem_reset(&sem_discovered);
         err = bt_gatt_discover(default_conn, &discover_params);
-        if (err || k_sem_take(&sem_discovered, K_SECONDS(10))) {
+        if (err) {
             printk("[GATT] discover err %d or timeout\n", err);
+            goto disconnect;
+        }
+        if(k_sem_take(&sem_discovered, K_SECONDS(10))){
+            printk("[GATT] discover timed out \n");
             goto disconnect;
         }
 
@@ -503,8 +530,12 @@ int main(void)
 
         k_sem_reset(&sem_written);
         err = bt_gatt_write(default_conn, &write_params);
-        if (err || k_sem_take(&sem_written, K_SECONDS(10))) {
+        if (err) {
             printk("[GATT] write err %d or timeout\n", err);
+            goto disconnect;
+        }
+        if(k_sem_take(&sem_written, K_SECONDS(10))){
+            printk("[GATT] write timed out \n");
             goto disconnect;
         }
 
@@ -535,50 +566,107 @@ int main(void)
     g_active_bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
     reset_bitmaps_for(g_active_num_slots);
 
+	printk("[ADV] aggressvive periodic interval = %u units (~%u ms) \n", per_adv_params.interval_max, per_adv_params.interval_max * 5/4);
     err = bt_le_per_adv_set_param(adv_pawr, &per_adv_params);
-    if (err) { printk("Failed to set periodic (aggr) err %d\n", err); return 0; }
-
-    err = bt_le_per_adv_start(adv_pawr);
-    k_sleep(K_MSEC(20)); /* arm */
-    if (err) { printk("Failed to start periodic (aggr) err %d\n", err); return 0; }
-    printk("Switched to aggressive PAwR (N=%u)\n", (unsigned)NUM_RSP_SLOTS);
-
-    /* --------- Re-PAST: reconnect each device to transfer the *new* periodic timing --------- */
-    uint8_t repasted = 0;
-    while (repasted < CONFIG_BT_MAX_THROUGHPUT_DEVICES) {
-        k_sleep(K_MSEC(5));
-        int s_err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, device_found);
-        if (s_err) { printk("[RE-PAST] scan start err %d\n", s_err); break; }
-
-        if (k_sem_take(&sem_connected, K_SECONDS(10))) {
-            printk("[RE-PAST] no connection in time; retry\n");
-            (void)bt_le_scan_stop();
-            reset_prov_sems();
-            continue;
-        }
-        (void)bt_le_scan_stop();
-
-        printk("[RE-PAST] Initiating PAST of aggressive periodic...\n");
-        s_err = bt_le_per_adv_set_info_transfer(adv_pawr, default_conn, 0);
-        if (s_err) {
-            printk("[RE-PAST] transfer err %d\n", s_err);
-        } else {
-            repasted++;
-            printk("[RE-PAST] OK (%u/%u)\n", repasted, CONFIG_BT_MAX_THROUGHPUT_DEVICES);
-        }
-
-        k_sleep(K_MSEC(per_adv_params.interval_max * 2));
-        if (default_conn) {
-            (void)bt_conn_disconnect(default_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-            (void)k_sem_take(&sem_disconnected, K_SECONDS(5));
-            bt_conn_unref(default_conn);
-            default_conn = NULL;
-        }
-        reset_prov_sems();
+    if (err) { 
+        printk("Failed to set periodic (aggr) err %d\n", err); 
+        return 0; 
     }
 
-    printk("All devices re-PASTed to aggressive PAwR\n");
+    err = bt_le_per_adv_start(adv_pawr);
+    k_sleep(K_MSEC(per_adv_params.interval_max * 3)); /* arm */
+    if (err) { 
+        printk("Failed to start periodic (aggr) err %d\n", err); 
+        return 0; 
+    }
+    printk("Switched to aggressive PAwR (N=%u)\n", (unsigned)NUM_RSP_SLOTS);
 
+    uint8_t repasted = 0;
+
+	printk("[RE-PAST] Starting re-PAST pass for %u devices\n", (unsigned)CONFIG_BT_MAX_THROUGHPUT_DEVICES);
+
+	/* Small settle to let controller start advertising robustly */
+	k_sleep(K_MSEC(50));
+
+	while (repasted < CONFIG_BT_MAX_THROUGHPUT_DEVICES) {
+		k_sleep(K_MSEC(5)); /* avoid BSIM churn */
+
+		int s_err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, device_found);
+		if (s_err) {
+			printk("[RE-PAST] scan start err %d\n", s_err);
+			break;
+		}
+
+		if (k_sem_take(&sem_connected, K_SECONDS(15))) {
+			printk("[RE-PAST] no connection in time; retry\n");
+			(void)bt_le_scan_stop();
+			reset_prov_sems();
+			continue;
+		}
+		(void)bt_le_scan_stop();
+
+		/* Try a few times to hand over the new periodic */
+		const int max_retries = 3;
+		int try;
+		int perr = -1;
+		for (try = 0; try < max_retries; try++) {
+			printk("[RE-PAST] Attempt %d to transfer periodic to peer\n", try + 1);
+			perr = bt_le_per_adv_set_info_transfer(adv_pawr, default_conn, 0);
+			if (perr == 0) {
+				printk("[RE-PAST] transfer OK on attempt %d\n", try + 1);
+				break;
+			} else {
+				printk("[RE-PAST] transfer err %d on attempt %d\n", perr, try + 1);
+				/* small backoff before retrying */
+				k_sleep(K_MSEC(50));
+			}
+		}
+
+		if (perr != 0) {
+			printk("[RE-PAST] transfer ultimately failed after %d attempts (err %d)\n", max_retries, perr);
+		} else {
+			repasted++;
+			printk("[RE-PAST] OK (%u/%u)\n", repasted, CONFIG_BT_MAX_THROUGHPUT_DEVICES);
+		}
+
+		/* Keep connection alive briefly to allow controller to send PAST HCI packet
+		* and for peer to process connect-level events. 150..250 ms is usually enough.
+		*/
+		k_sleep(K_MSEC(100));
+
+		/* Now disconnect cleanly */
+		if (default_conn != NULL) {
+			(void)bt_conn_disconnect(default_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+			(void)k_sem_take(&sem_disconnected, K_SECONDS(5));
+			bt_conn_unref(default_conn);
+			default_conn = NULL;
+		}
+		reset_prov_sems();
+	}
+
+	printk("All devices re-PASTed (successful: %u)\n", repasted);
+
+    /* Re-assert periodic arm robustly: stop → set params → start.
+     * Controller returns -EACCES if params are changed while running,
+     * and -EALREADY if already in the desired state — both benign. */
+    int serr = bt_le_per_adv_stop(adv_pawr);
+    if (serr && serr != -EALREADY) {
+        printk("Stop periodic (aggr) err %d\n", serr);
+    }
+
+    err = bt_le_per_adv_set_param(adv_pawr, &per_adv_params);
+    if (err && err != -EACCES) {
+        printk("Failed to set periodic (aggr) err %d\n", err);
+        return 0;
+    }
+
+    err = bt_le_per_adv_start(adv_pawr);
+    if (err && err != -EALREADY) {
+        printk("Failed to start periodic (aggr) err %d\n", err);
+        return 0;
+    }
+
+    
     /* --------- Data phase --------- */
     for (;;) {
         k_sleep(K_SECONDS(1));
