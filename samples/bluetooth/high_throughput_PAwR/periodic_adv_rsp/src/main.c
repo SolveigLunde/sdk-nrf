@@ -128,6 +128,9 @@ static inline void reset_bitmaps_for(uint16_t num_slots) {
     bitmap_clear(response_bitmap,  num_slots);
     bitmap_clear(expected_responses, num_slots);
 }
+static inline void reset_receipts_for_event(uint16_t num_slots) {
+    bitmap_clear(response_bitmap, num_slots); // only per-event receipts
+}
 
 /* ---------- Advertiser callbacks ---------- */
 static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_data_request *request)
@@ -155,8 +158,8 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         }
     }
 
-    /* Clear this-event receipt map before sending new ack map */
-    reset_bitmaps_for(g_active_num_slots);
+    /* NEW */
+    reset_receipts_for_event(g_active_num_slots);
 
     for (size_t i = 0; i < to_send; i++) {
         struct net_buf_simple *buf = &bufs[i];
@@ -401,6 +404,7 @@ struct pawr_timing {
     uint8_t  subevent;
     uint8_t  response_slot;
     uint16_t total_devices;
+    uint8_t  adv_sid;       /* extended advertising SID used for periodic */
 } __packed;
 
 static uint8_t num_synced;
@@ -435,6 +439,8 @@ int main(void)
         printk("Failed to create adv (pawr) err %d\n", err); 
         return 0; 
     }
+
+    /* If your SDK lacks bt_le_ext_adv_set_sid(), rely on scanned SID on the sync side */
 
     /* Start EXTENDED ADV now; lenient periodic will be started below */
     err = bt_le_ext_adv_start(adv_pawr, BT_LE_EXT_ADV_START_DEFAULT);
@@ -520,6 +526,7 @@ int main(void)
         sync_config.subevent      = 0;
         sync_config.response_slot = num_synced;
         sync_config.total_devices = CONFIG_BT_MAX_THROUGHPUT_DEVICES;
+        sync_config.adv_sid       = 0; /* BT_LE_EXT_ADV_NCONN uses SID 0 by default */
 
         memset(&write_params, 0, sizeof(write_params));
         write_params.func   = write_func;
@@ -562,8 +569,9 @@ int main(void)
     bt_le_per_adv_stop(adv_pawr);
     init_adv_params(); /* sets per_adv_params via set_pawr_params(..., NUM_RSP_SLOTS) */
 
-    g_active_num_slots    = NUM_RSP_SLOTS;
-    g_active_bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
+    /* Align active slots with the configured periodic params to avoid -EINVAL */
+    g_active_num_slots    = per_adv_params.num_response_slots;
+    g_active_bitmap_bytes = BITMAP_BYTES_NEEDED(g_active_num_slots);
     reset_bitmaps_for(g_active_num_slots);
 
 	printk("[ADV] aggressvive periodic interval = %u units (~%u ms) \n", per_adv_params.interval_max, per_adv_params.interval_max * 5/4);
@@ -572,6 +580,8 @@ int main(void)
         printk("Failed to set periodic (aggr) err %d\n", err); 
         return 0; 
     }
+
+    k_sleep(K_MSEC(per_adv_params.interval_max * 10)); // Longer delay to ensure stable advertising
 
     err = bt_le_per_adv_start(adv_pawr);
     k_sleep(K_MSEC(per_adv_params.interval_max * 3)); /* arm */
@@ -617,8 +627,8 @@ int main(void)
 				break;
 			} else {
 				printk("[RE-PAST] transfer err %d on attempt %d\n", perr, try + 1);
-				/* small backoff before retrying */
-				k_sleep(K_MSEC(50));
+				// Longer backoff with exponential increase
+                k_sleep(K_MSEC(100 * (1 << try)));
 			}
 		}
 
@@ -629,10 +639,10 @@ int main(void)
 			printk("[RE-PAST] OK (%u/%u)\n", repasted, CONFIG_BT_MAX_THROUGHPUT_DEVICES);
 		}
 
-		/* Keep connection alive briefly to allow controller to send PAST HCI packet
-		* and for peer to process connect-level events. 150..250 ms is usually enough.
-		*/
-		k_sleep(K_MSEC(100));
+        /* Keep connection alive to allow controller to send PAST HCI packet
+        * and for peer to process events. Use a safer dwell.
+        */
+        k_sleep(K_MSEC(300));
 
 		/* Now disconnect cleanly */
 		if (default_conn != NULL) {
