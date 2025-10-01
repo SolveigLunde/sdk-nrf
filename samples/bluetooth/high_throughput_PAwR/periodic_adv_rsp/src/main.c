@@ -440,7 +440,6 @@ int main(void)
         return 0; 
     }
 
-    /* If your SDK lacks bt_le_ext_adv_set_sid(), rely on scanned SID on the sync side */
 
     /* Start EXTENDED ADV now; lenient periodic will be started below */
     err = bt_le_ext_adv_start(adv_pawr, BT_LE_EXT_ADV_START_DEFAULT);
@@ -457,7 +456,7 @@ int main(void)
     g_active_bitmap_bytes = 1;
     reset_bitmaps_for(g_active_num_slots);
 
-	printk("[ADV] regular periodic interval = %u units (~%u ms) \n", per_adv_params.interval_max, per_adv_params.interval_max * 5/4);
+	printk("[ADV] regular periodic interval = %u units (~%u ms) \n", per_lenient.interval_max, per_lenient.interval_max * 5/4);
     err = bt_le_per_adv_set_param(adv_pawr, &per_lenient);
     if (err) { 
         printk("Failed to set periodic (lenient) err %d\n", err); 
@@ -628,7 +627,7 @@ int main(void)
 			} else {
 				printk("[RE-PAST] transfer err %d on attempt %d\n", perr, try + 1);
 				// Longer backoff with exponential increase
-                k_sleep(K_MSEC(100 * (1 << try)));
+                k_sleep(K_MSEC(75 * (1 << try)));
 			}
 		}
 
@@ -642,7 +641,7 @@ int main(void)
         /* Keep connection alive to allow controller to send PAST HCI packet
         * and for peer to process events. Use a safer dwell.
         */
-        k_sleep(K_MSEC(300));
+        k_sleep(K_MSEC(200));
 
 		/* Now disconnect cleanly */
 		if (default_conn != NULL) {

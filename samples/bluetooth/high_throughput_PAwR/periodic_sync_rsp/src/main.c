@@ -52,22 +52,30 @@ static void apply_subevent_filter_if_ready(void)
         return;
     }
 
+    /* Only filter if there are multiple subevents and index is valid */
+    if(pawr_timing.subevent == 0xFF){
+        return;
+    }
     struct bt_le_per_adv_sync_subevent_params params;
-    uint8_t subevents[1] = {pending_subevent};
-    params.properties   = BT_LE_PER_ADV_SYNC_SUBEVENT_PARAMS_ENABLE_RESPONSE;
+    uint8_t subevents[1];
+
+    params.properties    = 0;
     params.num_subevents = 1;
     params.subevents     = subevents;
-    //subevents[0]         = pending_subevent;
 
-    if(have_pending_filter){
-        int err = bt_le_per_adv_sync_subevent(default_sync, &params);
+    subevents[0]         = pending_subevent;
+
+    
+    int err = bt_le_per_adv_sync_subevent(default_sync, &params);
     if (err) {
         printk("[TIMING] set subevents failed (err %d)\n", err);
-    } else {
-        printk("[TIMING] subevent filter applied: %u\n", pending_subevent);
-        have_pending_filter = false; /* done */
+        have_pending_filter = false; 
+        return;
     }
-    }
+
+    printk("[TIMING] subevent filter applied: %u\n", pending_subevent);
+    have_pending_filter = false; 
+    
 }
 
 
@@ -99,7 +107,7 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     default_sync = sync;
 
     /* Now we have a handle → apply any pending subevent filter */
-    apply_subevent_filter_if_ready();
+    //apply_subevent_filter_if_ready();
 
     k_sem_give(&sem_per_sync);
     printk("OMGGGGGGG GAVE sem_per_sync\n");  
@@ -128,10 +136,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
                 const struct bt_le_per_adv_sync_recv_info *info,
                 struct net_buf_simple *buf)
 {   
-    //if (info) {
-    //    printk("[RECV] period_event=%u subevent=%u sid=%u rssi=%d\n",
-    //           info->periodic_event_counter, info->subevent, info->sid, info->rssi);
-    //}
 
     int err;
 
@@ -178,8 +182,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
         } else {
             printk("Successfully sent %d bytes of response data on slot %d\n", rsp_size, pawr_timing.response_slot);
         }
-    } else {
-        //printk("Failed to receive on subevent %d\n", info->subevent);
     }
 }
 
@@ -276,13 +278,13 @@ static ssize_t write_timing(struct bt_conn *conn, const struct bt_gatt_attr *att
     have_pending_filter  = true;
 
     /* If we already synced (e.g., re-PAST path), apply now. */
-    apply_subevent_filter_if_ready();
+    //apply_subevent_filter_if_ready();
 
     printk("[TIMING] got timing: subevent=%u, slot=%u, total=%u (sid=%u)\n",
     pawr_timing.subevent, pawr_timing.response_slot, pawr_timing.total_devices, pawr_timing.adv_sid);
 
     /* Stop connectable advertising after provisioning to favor scanning+sync */
-    (void)bt_le_adv_stop();
+    //(void)bt_le_adv_stop();
 
     return len;
 }
@@ -437,12 +439,6 @@ int main(void)
         scanning_started = true;
         printk("[INIT] Passive scan enabled\n");
     }
-
-    /* Register PAwR sync lifecycle callbacks (these you already have) */
-    //bt_le_per_adv_sync_cb_register(&sync_callbacks);
-
-    /* NOTE: do NOT call bt_le_per_adv_sync_transfer_cb_register();
-       that API is not present in your tree and isn't needed. */
 
     do {
         if (is_syncing && !default_conn && !default_sync) {
