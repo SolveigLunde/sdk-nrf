@@ -1,0 +1,31 @@
+# Copyright (c) 2024 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Maximum Throughput Sample"
+
+config MAX_THROUGHPUT
+	bool "Maximum Throughput Sample Settings"
+	default y
+	help
+		Enable configuration options for maximum throughput sample
+
+config BT_MAX_THROUGHPUT_DEVICES
+	int "Number of PAwR scanner devices"
+	default 16
+	range 1 255
+	depends on MAX_THROUGHPUT
+	help
+		Number of scanner devices that will participate in the PAwR communication.
+		This affects memory usage and timing calculations.
+		IMPORTANT: This value must match the NUM_SYNCHRONIZERS in run_devices.sh
+		
+		Optimal configurations within 1650-byte buffer limit:
+		- 16 devices × 102 bytes = 1632 bytes (98.9% efficiency)
+		- 12 devices × 137 bytes = 1644 bytes (99.6% efficiency)
+		- 8 devices × 206 bytes = 1648 bytes (99.9% efficiency)
+		
+		Higher device counts require smaller packet sizes to fit buffer constraints.
+
+
+
+source "Kconfig.zephyr" 
