@@ -12,8 +12,6 @@
 
 #define NAME_LEN 30
 
-// Buffer size constraints from Nordic SDK
-#define MAX_PAWR_TOTAL_BUFFER_SIZE 2048 // CONFIG_BT_CTLR_ADV_DATA_LEN_MAX limit
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 
 // Dynamic device count - will be set by advertiser
@@ -29,7 +27,7 @@ static uint16_t calculate_optimal_response_size(uint16_t device_count) {
     }
     
     // Always use maximum PDU size
-    uint16_t optimal_size = 230;
+    uint16_t optimal_size = MAX_INDIVIDUAL_RESPONSE_SIZE - 3; // Hvis du går opp til 247 får jeg 3 byte overhead (som ga lav throughput). Enkel fiks var bare å ta -3. 
     printk("Using maximum PDU size: %u bytes\n", optimal_size);
     
     return optimal_size;
@@ -103,12 +101,12 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
     if (dynamic_rsp_size == 0) {
         dynamic_rsp_size = calculate_optimal_response_size(actual_device_count);
         if (actual_device_count > 0) {
-            printk("📱 Responder using dynamic response size: %d bytes\n", dynamic_rsp_size);
-            printk("   Configured for %d devices = %d bytes total\n", 
+            printk("Responder using dynamic response size: %d bytes\n", dynamic_rsp_size);
+            printk("Configured for %d devices = %d bytes total\n", 
                    actual_device_count, actual_device_count * dynamic_rsp_size);
         } else {
-            printk("📱 Responder using fallback response size: %d bytes\n", dynamic_rsp_size);
-            printk("   Will be reconfigured when advertiser provides device count\n");
+            printk("Responder using fallback response size: %d bytes\n", dynamic_rsp_size);
+            printk("Will be reconfigured when advertiser provides device count\n");
         }
     }
 

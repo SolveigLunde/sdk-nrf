@@ -38,96 +38,113 @@ typedef struct {
     uint8_t num_devices;
     uint16_t packet_size;
     uint16_t total_bytes_per_interval;
-    uint32_t throughput_bps;
     uint16_t interval_ms;
-    float efficiency_ratio;
 } config_t;
 
 
 
-config_t calculate_optimal_config(uint8_t num_response_slots) {
-    config_t config = {0};
-   
-    // Just use max PDU size directly
-    uint16_t max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; // 247 bytes
-   
-    uint16_t total_bytes = num_response_slots * max_packet_size;
-   
-    // Calculate throughput assuming 2M PHY
-    //uint32_t throughput_bps = (total_bytes * 8 * 1000) / target_interval_ms;
-   
+config_t calculate_optimal_config(uint8_t num_response_slots)
+{
+    config_t config = (config_t){0};
+
+    /* Maximize per-slot payload while keeping a single subevent */
+    const uint16_t max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; /* 247 bytes */
+
     config.num_devices = num_response_slots;
     config.packet_size = max_packet_size;
-    config.total_bytes_per_interval = total_bytes;
-    //config.throughput_bps = throughput_bps;
-    //config.interval_ms = target_interval_ms;
-    //config.efficiency_ratio = 1.0f; // No longer relevant
-   
+    config.total_bytes_per_interval = (uint16_t)(num_response_slots * max_packet_size);
+
     return config;
 }
  
  
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
-    const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;   // 7.5 ms
-    const uint8_t MIN_PAWR_INTERVAL_MS = 50;           // Minimum safe PAwR interval
-    const float MARGIN_MS = 8.0f;                      // Increased safety margin
-    const float ADVERTISER_GUARD_MS = 5.0f;            // guard time for advertiser
-    const uint8_t PHY_RATE_MBPS = 2;                   // 2M PHY
-    const float SLOT_GUARD_TIME_MS = 0.5f;             // Extra guard time between slots
-    
-    // Calculate base packet timing
-    uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE;
+    /* BLE spec / Zephyr API constraints (see bt_le_per_adv_param docs) */
+    const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;      /* 6 * 1.25 ms = 7.5 ms */
+    const uint16_t MIN_PAWR_INTERVAL_MS = 50;             /* generous lower bound for stability */
+    const float SAFETY_MARGIN_MS = 6.0f;                  /* extra budget for join/sync */
+    const float ADVERTISER_GUARD_MS = 4.0f;               /* end-of-event guard */
+    const uint8_t PHY_RATE_MBPS = 2;                      /* assume 2M PHY */
+    const float SLOT_GUARD_TIME_MS = 0.5f;                /* per-slot guard */
+
+    /* Max per-slot payload for PAwR responses */
+    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; /* 247 bytes */
     dynamic_rsp_size = packet_size;
-    
-    // Raw TX time (247B @ 2Mbps ≈ 0.988ms)
-    float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000); 
-    // Add ~20% margin for turnaround + interframe spacing + guard time
-    float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);  
 
-    // Slot spacing in BLE units (0.125 ms)
-    uint8_t slot_spacing = (uint8_t)((slot_time_ms + 0.124f) / 0.125f);
-    if (slot_spacing < 8) slot_spacing = 8;  // Increased minimum slot spacing
+    /* Approximate on-air time + radio turnarounds at 2M PHY */
+    const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f); /* ~0.988 ms */
+    const float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);
 
-    uint8_t delay = MIN_RESPONSE_SLOT_DELAY_UNITS;
+    /* Convert per-slot time to spacing in 0.125 ms units, clamp per API (0.25..31.875 ms) */
+    uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);
+    if (slot_spacing_units < 2) {
+        slot_spacing_units = 2;
+    } else if (slot_spacing_units > 255) {
+        slot_spacing_units = 255;
+    }
+    if (num_response_slots > 48) {
+        printk("Increasing slot spacing for %d devices\n", num_response_slots);
+        slot_spacing_units += 1;
+    }
 
-    // Calculate subevent duration (ms) - this is just for the responses
-    float subevent_duration_ms = delay * 1.25f + num_response_slots * (slot_spacing * 0.125f);
+    const uint8_t delay_units = MIN_RESPONSE_SLOT_DELAY_UNITS; /* 1.25 ms units */
 
-    // Calculate total event time including overhead
-    float total_event_time_ms = (delay * 1.25f) + (num_response_slots * slot_time_ms) 
-                               + ADVERTISER_GUARD_MS + MARGIN_MS;
+    /* Duration of a single subevent must accommodate all response slots.
+     * Convert spacing (0.125 ms units) into 1.25 ms units when computing subevent_interval.
+     */
+    const uint32_t subevent_duration_ms_x100 = (uint32_t)delay_units * 125U +
+                                               (uint32_t)num_response_slots * ((uint32_t)slot_spacing_units * 125U / 10U);
+    /* subevent_interval is in 1.25 ms units, 7.5..318.75 ms (6..255 units). */
+    uint16_t subevent_interval_units = (uint16_t)((subevent_duration_ms_x100 + 125U - 1U) / 125U);
+    if (subevent_interval_units < 6) {
+        subevent_interval_units = 6;
+    } else if (subevent_interval_units > 255) {
+        /* Too many slots at this spacing to fit in one subevent window. Keep max allowed and warn. */
+        subevent_interval_units = 255;
+        printk("Warning: subevent too long for one window; consider fewer devices or smaller payload.\n");
+    }
 
-    // Convert to BLE interval units (0.125 ms units)
-    uint16_t subevent_interval_units = (uint16_t)ceilf(subevent_duration_ms / 1.25f);
-    
-    // PAwR interval must be ≥ MIN_PAWR_INTERVAL_MS and large enough for all responses
-    uint16_t min_interval_units = (uint16_t)ceilf(MIN_PAWR_INTERVAL_MS / 1.25f);
-    uint16_t required_interval_units = (uint16_t)ceilf(total_event_time_ms / 1.25f);
-    uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units) ? 
-                                               required_interval_units : min_interval_units;
+    /* Full periodic advertising event budget in 1/100 ms to avoid floats */
+    const uint32_t total_event_time_ms_x100 = (uint32_t)delay_units * 125U +
+                                              (uint32_t)num_response_slots * ((uint32_t)slot_spacing_units * 125U / 10U) +
+                                              (uint32_t)((ADVERTISER_GUARD_MS + SAFETY_MARGIN_MS) * 100.0f);
 
-    // Fill params - PAwR interval is larger than subevent interval
+    const uint16_t min_interval_units = (uint16_t)((MIN_PAWR_INTERVAL_MS + 1) / 1.25f); /* small bias upward */
+    const uint16_t required_interval_units = (uint16_t)((total_event_time_ms_x100 + 125U - 1U) / 125U);
+    const uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units)
+                                                          ? required_interval_units
+                                                          : min_interval_units;
+
+    /* One subevent, N slots, maximum payload per slot */
     params->interval_min = advertising_event_interval_units;
     params->interval_max = advertising_event_interval_units;
+    params->options = 0;
     params->num_subevents = 1;
-    params->subevent_interval = subevent_interval_units;
-    params->response_slot_delay = delay;
-    params->response_slot_spacing = slot_spacing;
+    params->subevent_interval = (uint8_t)subevent_interval_units;
+    params->response_slot_delay = delay_units;
+    params->response_slot_spacing = (uint8_t)slot_spacing_units;
     params->num_response_slots = num_response_slots;
 
-    // Debug info - convert to integers for printk
-    uint32_t adv_event_ms = (uint32_t)(advertising_event_interval_units * 1.25f);
-    uint32_t subevent_ms = (uint32_t)(subevent_interval_units * 1.25f);
-    uint32_t slot_ms_x100 = (uint32_t)(slot_spacing * 0.125f * 100); // x100 for 2 decimal places
-    uint32_t est_throughput_kbps = (uint32_t)((num_response_slots * packet_size * 8ULL * 1000ULL) / 
-                                             (advertising_event_interval_units * 1.25f)) / 1000;
+    /* Diagnostics */
+    const uint32_t adv_event_ms_x100 = (uint32_t)advertising_event_interval_units * 125U;
+    const uint32_t subevent_ms_x100 = (uint32_t)subevent_interval_units * 125U;
+    const uint32_t slot_ms_x100 = (uint32_t)slot_spacing_units * 125U / 10U;
+    const uint32_t est_throughput_kbps =
+        (adv_event_ms_x100 > 0U)
+            ? (uint32_t)(((uint64_t)num_response_slots * packet_size * 8ULL * 100000ULL) /
+                         (uint64_t)adv_event_ms_x100) /
+                  1000U
+            : 0U;
 
-    printk("PAwR config:\n");
-    printk("  Devices: %d, Slot: %u.%02u ms, Delay: %u, SubEvt: %u ms\n",
-           num_response_slots, slot_ms_x100/100, slot_ms_x100%100, delay, subevent_ms);
-    printk("  AdvEvent: %u ms, Throughput ≈ %u kbps\n",
-           adv_event_ms, est_throughput_kbps);
+    printk("PAwR config (1 subevent):\n");
+    printk("  Devices: %u, Resp size: %u B, Slot: %u.%02u ms\n",
+           num_response_slots, packet_size, slot_ms_x100 / 100U, slot_ms_x100 % 100U);
+    printk("  Delay: %u (%u.%02u ms), SubEvt: %u (%u.%02u ms), AdvInt: %u (%u.%02u ms)\n",
+           delay_units, (uint32_t)delay_units * 125U / 100U, (uint32_t)delay_units * 125U % 100U,
+           subevent_interval_units, subevent_ms_x100 / 100U, subevent_ms_x100 % 100U,
+           advertising_event_interval_units, adv_event_ms_x100 / 100U, adv_event_ms_x100 % 100U);
+    printk("  Est. uplink throughput ~%u kbps \n", (unsigned int)est_throughput_kbps);
 }
 
 
@@ -418,15 +435,6 @@ static const struct bt_le_ext_adv_cb adv_cb = {
 	.pawr_response = response_cb,
 };
 
-/*
- * All connection/PAST/GATT logic removed in favor of in-band claim/ack via PAwR
- */
-
- 
-/* No scanning/connecting on the advertiser */
-
-
-/* No GATT discovery/write on the advertiser */
 
 void init_bufs(void)
 {
