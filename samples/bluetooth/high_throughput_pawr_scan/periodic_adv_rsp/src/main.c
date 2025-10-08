@@ -30,47 +30,29 @@
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define THROUGHPUT_PRINT_INTERVAL 1000 
 
-static uint16_t dynamic_rsp_size = 247;
 static uint32_t total_bytes;
 static uint64_t stamp;
 
-typedef struct {
-    uint8_t num_devices;
-    uint16_t packet_size;
-    uint16_t total_bytes_per_interval;
-    uint16_t interval_ms;
-} config_t;
-
-
-
-config_t calculate_optimal_config(uint8_t num_response_slots)
-{
-    config_t config = (config_t){0};
-
-    /* Maximize per-slot payload while keeping a single subevent */
-    const uint16_t max_packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; /* 247 bytes */
-
-    config.num_devices = num_response_slots;
-    config.packet_size = max_packet_size;
-    config.total_bytes_per_interval = (uint16_t)(num_response_slots * max_packet_size);
-
-    return config;
-}
+/* Cached PAwR config for reporting, used in throughput printouts */
+static uint16_t g_num_rsp_slots_print;
+static uint16_t g_payload_size_print;
+static uint32_t g_adv_event_ms_x100_print;
+static uint32_t g_theoretical_kbps;
  
- 
+
+// I have altered this function to calculate optimal parameters and tuned the parameters manually :) 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
     /* BLE spec / Zephyr API constraints (see bt_le_per_adv_param docs) */
     const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;      /* 6 * 1.25 ms = 7.5 ms */
-    const uint16_t MIN_PAWR_INTERVAL_MS = 50;             /* generous lower bound for stability */
-    const float SAFETY_MARGIN_MS = 6.0f;                  /* extra budget for join/sync */
-    const float ADVERTISER_GUARD_MS = 4.0f;               /* end-of-event guard */
+    const uint16_t MIN_PAWR_INTERVAL_MS = 1;             /* increase lower bound for stability if needed */
+    const float SAFETY_MARGIN_MS = 0.0f;                  /* extra guard for join/sync, increase if needed */
+    const float ADVERTISER_GUARD_MS = 1.0f;               /* end-of-event guard, increase if needed*/
     const uint8_t PHY_RATE_MBPS = 2;                      /* assume 2M PHY */
     const float SLOT_GUARD_TIME_MS = 0.5f;                /* per-slot guard */
 
     /* Max per-slot payload for PAwR responses */
-    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; /* 247 bytes */
-    dynamic_rsp_size = packet_size;
+    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; 
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
     const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f); /* ~0.988 ms */
@@ -78,14 +60,8 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
 
     /* Convert per-slot time to spacing in 0.125 ms units, clamp per API (0.25..31.875 ms) */
     uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);
-    if (slot_spacing_units < 2) {
-        slot_spacing_units = 2;
-    } else if (slot_spacing_units > 255) {
+    if (slot_spacing_units > 255) {
         slot_spacing_units = 255;
-    }
-    if (num_response_slots > 48) {
-        printk("Increasing slot spacing for %d devices\n", num_response_slots);
-        slot_spacing_units += 1;
     }
 
     const uint8_t delay_units = MIN_RESPONSE_SLOT_DELAY_UNITS; /* 1.25 ms units */
@@ -137,6 +113,12 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
                   1000U
             : 0U;
 
+	/* Cache for later window reports */
+	g_num_rsp_slots_print = num_response_slots;
+	g_payload_size_print = packet_size;
+	g_adv_event_ms_x100_print = adv_event_ms_x100;
+	g_theoretical_kbps = est_throughput_kbps;
+
     printk("PAwR config (1 subevent):\n");
     printk("  Devices: %u, Resp size: %u B, Slot: %u.%02u ms\n",
            num_response_slots, packet_size, slot_ms_x100 / 100U, slot_ms_x100 % 100U);
@@ -144,7 +126,7 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
            delay_units, (uint32_t)delay_units * 125U / 100U, (uint32_t)delay_units * 125U % 100U,
            subevent_interval_units, subevent_ms_x100 / 100U, subevent_ms_x100 % 100U,
            advertising_event_interval_units, adv_event_ms_x100 / 100U, adv_event_ms_x100 % 100U);
-    printk("  Est. uplink throughput ~%u kbps \n", (unsigned int)est_throughput_kbps);
+	printk("  Est. uplink throughput (theoretical) ~%u kbps\n", (unsigned int)est_throughput_kbps);
 }
 
 
@@ -411,15 +393,35 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 
         if (k_uptime_get_32() - stamp > THROUGHPUT_PRINT_INTERVAL) {
             delta = k_uptime_delta(&stamp);
-			
-
-            printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
-                   total_bytes, total_bytes / 1024, 
-                   delta, ((uint64_t)total_bytes * 8 / delta));
+			/* Measured kbps over the window */
+			uint64_t measured_kbps = (delta > 0) ? (((uint64_t)total_bytes * 8ULL) / (uint64_t)delta) : 0ULL;
+			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
+			   total_bytes, total_bytes / 1024, delta, measured_kbps);
+			/* Context lines: theoretical and efficiency (avoid divide by zero) */
+			if (g_adv_event_ms_x100_print > 0 && g_num_rsp_slots_print > 0) {
+				/* Recompute theoretical in case config changed mid-run */
+				uint32_t theo_kbps = (uint32_t)(((uint64_t)g_num_rsp_slots_print * g_payload_size_print * 8ULL * 100000ULL) /
+									(uint64_t)g_adv_event_ms_x100_print) / 1000U;
+				printk("[PAwR] theoretical ~%u kbps; efficiency ~%u%% (N=%u, payload=%u, AdvInt=%u.%02u ms)\n",
+				       (unsigned int)theo_kbps,
+				       (unsigned int)((theo_kbps > 0) ? (uint32_t)((measured_kbps * 100ULL) / theo_kbps) : 0U),
+				       (unsigned int)g_num_rsp_slots_print,
+				       (unsigned int)g_payload_size_print,
+				       (unsigned int)(g_adv_event_ms_x100_print / 100U),
+				       (unsigned int)(g_adv_event_ms_x100_print % 100U));
+			}
 			FILE *log = fopen("throughput.log", "a");
 			if (log) {
-				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",total_bytes, 
-					total_bytes / 1024, delta, ((uint64_t)total_bytes * 8 / delta));
+				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n", total_bytes,
+					total_bytes / 1024, delta, measured_kbps);
+				if (g_adv_event_ms_x100_print > 0 && g_num_rsp_slots_print > 0) {
+					uint32_t theo_kbps = (uint32_t)(((uint64_t)g_num_rsp_slots_print * g_payload_size_print * 8ULL * 100000ULL) /
+										(uint64_t)g_adv_event_ms_x100_print) / 1000U;
+					uint32_t eff = (theo_kbps > 0) ? (uint32_t)((measured_kbps * 100ULL) / theo_kbps) : 0U;
+					fprintf(log, "[PAwR] theoretical ~%u kbps; efficiency ~%u%% (N=%u, payload=%u, AdvInt=%u.%02u ms)\n",
+							theo_kbps, eff, g_num_rsp_slots_print, g_payload_size_print,
+							(unsigned int)(g_adv_event_ms_x100_print / 100U), (unsigned int)(g_adv_event_ms_x100_print % 100U));
+				}
 				fclose(log);
 			}
             total_bytes = 0;

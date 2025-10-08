@@ -11,7 +11,6 @@
 #include <zephyr/random/random.h>
 
 #define NAME_LEN 30
-
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 
 // Dynamic device count - will be set by advertiser
@@ -277,9 +276,6 @@ static struct bt_le_per_adv_sync_cb sync_callbacks = {
 	.recv = recv_cb,
 };
 
-/* Removed GATT service and characteristic */
-
-/* No connection callbacks needed */
 
 /* Scan callback to detect periodic advertiser and create sync */
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
