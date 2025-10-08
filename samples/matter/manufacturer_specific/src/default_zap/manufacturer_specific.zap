@@ -693,7 +693,7 @@
               "side": "server",
               "type": "int16u",
               "included": 1,
-              "storageOption": "RAM",
+              "storageOption": "NVM",
               "singleton": 1,
               "bounded": 0,
               "defaultValue": "0",
@@ -2505,16 +2505,16 @@
       "id": 2,
       "name": "Anonymous Endpoint Type",
       "deviceTypeRef": {
-        "code": 1,
-        "profileId": 4095,
+        "code": 4293984257,
+        "profileId": 66562,
         "label": "nordic-dev-kit",
         "name": "nordic-dev-kit",
         "deviceTypeOrder": 0
       },
       "deviceTypes": [
         {
-          "code": 1,
-          "profileId": 4095,
+          "code": 4293984257,
+          "profileId": 66562,
           "label": "nordic-dev-kit",
           "name": "nordic-dev-kit",
           "deviceTypeOrder": 0
@@ -2524,11 +2524,11 @@
         1
       ],
       "deviceIdentifiers": [
-        1
+        4293984257
       ],
       "deviceTypeName": "nordic-dev-kit",
-      "deviceTypeCode": 1,
-      "deviceTypeProfileId": 4095,
+      "deviceTypeCode": 4293984257,
+      "deviceTypeProfileId": 66562,
       "clusters": [
         {
           "name": "NordicDevKit",
@@ -2653,7 +2653,7 @@
               "side": "server",
               "type": "char_string",
               "included": 1,
-              "storageOption": "RAM",
+              "storageOption": "NVM",
               "singleton": 0,
               "bounded": 0,
               "defaultValue": "Nordic Development Kit",
@@ -2669,7 +2669,7 @@
               "side": "server",
               "type": "boolean",
               "included": 1,
-              "storageOption": "RAM",
+              "storageOption": "NVM",
               "singleton": 0,
               "bounded": 0,
               "defaultValue": "false",
@@ -2720,7 +2720,7 @@
     {
       "endpointTypeName": "Anonymous Endpoint Type",
       "endpointTypeIndex": 1,
-      "profileId": 4095,
+      "profileId": 66562,
       "endpointId": 1,
       "networkId": 0,
       "parentEndpointIdentifier": null

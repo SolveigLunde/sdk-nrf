@@ -2224,6 +2224,8 @@ Trusted Firmware-M support
 
       .. tab:: nRF53 Series
 
+         For board targets supported by TF-M, see :ref:`ug_tfm_building_board_targets`.
+
          .. list-table:: TF-M profile support
             :header-rows: 1
             :widths: auto
@@ -2236,6 +2238,8 @@ Trusted Firmware-M support
               - Supported
 
       .. tab:: nRF54 Series
+
+         For board targets supported by TF-M, see :ref:`ug_tfm_building_board_targets`.
 
          .. list-table:: TF-M profile support
             :header-rows: 1
@@ -2250,17 +2254,19 @@ Trusted Firmware-M support
             * - :ref:`Configurable <ug_tfm_supported_services_profiles_configurable>`
               - --
               - --
-              - --
               - Experimental
-              - --
+              - Experimental
+              - Experimental (with :ref:`limitations <tfm_encrypted_its>`)
             * - :ref:`Minimal <ug_tfm_supported_services_profiles_minimal>`
               - --
               - --
-              - --
               - Experimental
-              - --
+              - Experimental
+              - Experimental (with :ref:`limitations <tfm_encrypted_its>`)
 
       .. tab:: nRF91 Series
+
+         For board targets supported by TF-M, see :ref:`ug_tfm_building_board_targets`.
 
          .. list-table:: TF-M profile support
             :header-rows: 1
@@ -2374,17 +2380,38 @@ The lists are organized by device Series and implementation.
             * - :ref:`IronSide Secure Element <ug_crypto_architecture_implementation_standards_ironside>`
               - --
 
-      .. tab:: nRF54 Series
+      .. tab:: nRF54H Series
 
-         The following tables list the cryptographic support for nRF54 Series devices.
-         The nRF54 Series devices do not support the :ref:`nrf_cc3xx <crypto_drivers_cc3xx>` driver.
+         The following tables list the cryptographic support for nRF54H Series devices.
+         nRF54H Series devices do not support either the :ref:`nrf_cc3xx <crypto_drivers_cc3xx>` or the :ref:`nrf_oberon <crypto_drivers_oberon>` drivers.
 
-         .. list-table:: Cryptographic support by implementation - nRF54 Series
+         .. list-table:: Cryptographic support by implementation - nRF54H Series
             :header-rows: 1
             :widths: auto
 
             * - Implementation
               - nRF54H20
+            * - :ref:`Oberon PSA Crypto - nrf_cc3xx <ug_crypto_architecture_implementation_standards_oberon>`
+              - --
+            * - :ref:`Oberon PSA Crypto - CRACEN <ug_crypto_architecture_implementation_standards_oberon>`
+              - --
+            * - :ref:`Oberon PSA Crypto - nrf_oberon <ug_crypto_architecture_implementation_standards_oberon>`
+              - --
+            * - :ref:`TF-M Crypto Service <ug_crypto_architecture_implementation_standards_tfm>`
+              - --
+            * - :ref:`IronSide Secure Element <ug_crypto_architecture_implementation_standards_ironside>`
+              - Supported
+
+      .. tab:: nRF54L Series
+
+         The following tables list the cryptographic support for nRF54L Series devices.
+         The nRF54L Series devices do not support the :ref:`nrf_cc3xx <crypto_drivers_cc3xx>` driver.
+
+         .. list-table:: Cryptographic support by implementation - nRF54L Series
+            :header-rows: 1
+            :widths: auto
+
+            * - Implementation
               - nRF54L05
               - nRF54L10
               - nRF54L15
@@ -2394,27 +2421,22 @@ The lists are organized by device Series and implementation.
               - --
               - --
               - --
-              - --
             * - :ref:`Oberon PSA Crypto - CRACEN <ug_crypto_architecture_implementation_standards_oberon>`
-              - --
               - Supported
               - Supported
               - Supported
               - Experimental
             * - :ref:`Oberon PSA Crypto - nrf_oberon <ug_crypto_architecture_implementation_standards_oberon>`
-              - --
               - Supported
               - Supported
               - Supported
               - Supported
             * - :ref:`TF-M Crypto Service <ug_crypto_architecture_implementation_standards_tfm>`
               - --
-              - --
               - Experimental
               - Experimental
-              - --
+              - Experimental
             * - :ref:`IronSide Secure Element <ug_crypto_architecture_implementation_standards_ironside>`
-              - Supported
               - --
               - --
               - --
@@ -2794,7 +2816,7 @@ The following table indicates the software maturity levels of the support for ea
               - nRF54L15
               - nRF54LM20
             * - **Immutable MCUboot as part of build**
-              - --
+              - Experimental
               - Supported
               - Supported
               - Supported
@@ -2828,7 +2850,7 @@ The following table indicates the software maturity levels of the support for ea
               - Experimental
               - Experimental
               - Experimental
-              - Experimental
+              - --
 
       .. tab:: nRF91 Series
 
@@ -3011,3 +3033,85 @@ The following table indicates the software maturity levels of the support for ea
               - Supported
               - --
               - --
+
+Front-End Modules support
+*************************
+
+The following table indicates the software maturity levels of the support for Front-End Modules:
+
+.. toggle::
+
+  .. software_maturity_fem_support_table_start
+
+  .. tabs::
+
+    .. group-tab:: nRF52 Series
+
+        .. list-table:: Front-End Module support
+          :widths: auto
+          :header-rows: 1
+
+          * - FEM device
+            - Implementation
+            - nRF52833
+            - nRF52840
+          * - nRF21540
+            - nRF21540 GPIO
+            - Supported
+            - Supported
+          * - nRF21540
+            - nRF21540 GPIO+SPI
+            - Supported
+            - Supported
+          * - SKY66112-11
+            - Simple GPIO
+            - Supported
+            - Supported
+
+    .. group-tab:: nRF53 Series
+
+        .. list-table:: Front-End Module support
+          :widths: auto
+          :header-rows: 1
+
+          * - FEM device
+            - Implementation
+            - nRF5340
+          * - nRF21540
+            - nRF21540 GPIO
+            - Supported
+          * - nRF21540
+            - nRF21540 GPIO+SPI
+            - Supported
+          * - SKY66112-11
+            - Simple GPIO
+            - Supported
+
+    .. group-tab:: nRF54 Series
+
+        .. list-table:: Front-End Module support
+          :widths: auto
+          :header-rows: 1
+
+          * - FEM device
+            - Implementation
+            - nRF54L10
+            - nRF54L15
+            - nRF54LM20
+          * - nRF21540
+            - nRF21540 GPIO
+            - Supported
+            - Supported
+            - --
+          * - nRF21540
+            - nRF21540 GPIO+SPI
+            - Supported
+            - Supported
+            - Supported
+          * - SKY66112-11
+            - Simple GPIO
+            - Supported
+            - Supported
+            - --
+
+  .. software_maturity_fem_support_table_end

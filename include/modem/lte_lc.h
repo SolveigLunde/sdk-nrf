@@ -184,13 +184,25 @@ enum lte_lc_func_mode {
 	/**
 	 * Sets the device to receive only functionality.
 	 *
-	 * Can be used, for example, to evaluate connections with
-	 * lte_lc_conn_eval_params_get().
+	 * Features supported by mfw_nrf9160 in receive only mode:
+	 * - lte_lc_conn_eval_params_get()
 	 *
-	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf9160 >= v1.3.0
-	 *       - mfw_nrf91x1
-	 *       - mfw_nrf9151-ntn
+	 * Features supported by mfw_nrf91x1 and mfw_nrf9151-ntn in receive only mode:
+	 * - Network selection
+	 * - lte_lc_conn_eval_params_get()
+	 * - lte_lc_neighbor_cell_measurement()
+	 * - lte_lc_env_eval()
+	 *
+	 * mfw_nrf91x1 and mfw_nrf9151-ntn perform network selection in receive only mode.
+	 * When the search has been completed, an @ref LTE_LC_EVT_MODEM_EVENT is sent with modem
+	 * event @ref LTE_LC_MODEM_EVT_SEARCH_DONE. The application can check the last received
+	 * @ref LTE_LC_EVT_CELL_UPDATE to see if a suitable cell was found or not.
+	 *
+	 * After network selection, device remains camped on the found cell, but will not try to
+	 * register unless the functional mode is changed. LTE registration can be triggered on
+	 * the cell by setting the functional mode to @ref LTE_LC_FUNC_MODE_NORMAL or
+	 * @ref LTE_LC_FUNC_MODE_ACTIVATE_LTE. Device should not be left in receive only mode for
+	 * longer than necessary, because current consumption will be elevated.
 	 */
 	LTE_LC_FUNC_MODE_RX_ONLY		= 2,
 
@@ -362,6 +374,20 @@ enum lte_lc_evt_type {
 	 */
 	LTE_LC_EVT_RAI_UPDATE			= 12,
 #endif /* CONFIG_LTE_LC_RAI_MODULE */
+
+#if defined(CONFIG_LTE_LC_ENV_EVAL_MODULE)
+	/**
+	 * Environment evaluation result.
+	 *
+	 * The associated payload is the @c lte_lc_evt.env_eval_result member of type
+	 * @ref lte_lc_env_eval_result in the event.
+	 *
+	 * @note This is only supported by the following modem firmware:
+	 *       - mfw_nrf91x1 >= v2.0.3
+	 *       - mfw_nrf9151-ntn
+	 */
+	LTE_LC_EVT_ENV_EVAL_RESULT		= 13,
+#endif /* CONFIG_LTE_LC_ENV_EVAL_MODULE */
 };
 
 /** RRC connection state. */
@@ -596,7 +622,7 @@ enum lte_lc_modem_sleep_type {
 	 * Proprietary PSM.
 	 *
 	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf91x1 >= v2.0.0
+	 *       - mfw_nrf91x1
 	 *       - mfw_nrf9151-ntn
 	 */
 	LTE_LC_MODEM_SLEEP_PROPRIETARY_PSM	= 7,
@@ -691,8 +717,8 @@ enum lte_lc_ce_level {
 	LTE_LC_CE_LEVEL_UNKNOWN	= UINT8_MAX,
 };
 
-/** Modem domain events. */
-enum lte_lc_modem_evt {
+/** Modem domain event type. */
+enum lte_lc_modem_evt_type {
 	/**
 	 * Indicates that a light search has been performed.
 	 *
@@ -737,40 +763,97 @@ enum lte_lc_modem_evt {
 	LTE_LC_MODEM_EVT_NO_IMEI,
 
 	/**
-	 * Selected CE level in RACH procedure is 0, see 3GPP TS 36.331 for details.
+	 * Selected CE level in RACH procedure. See 3GPP TS 36.331 for details.
+	 *
+	 * The associated payload is the @c lte_lc_modem_evt.ce_level member of type
+	 * @ref lte_lc_ce_level in the event.
 	 *
 	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf91x1 >= v2.0.0
+	 *       - mfw_nrf91x1
 	 *       - mfw_nrf9151-ntn
 	 */
-	LTE_LC_MODEM_EVT_CE_LEVEL_0,
+	LTE_LC_MODEM_EVT_CE_LEVEL,
 
 	/**
-	 * Selected CE level in RACH procedure is 1, see 3GPP TS 36.331 for details.
+	 * RF calibration or power class selection not done.
 	 *
 	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf91x1 >= v2.0.0
+	 *       - mfw_nrf91x1
 	 *       - mfw_nrf9151-ntn
 	 */
-	LTE_LC_MODEM_EVT_CE_LEVEL_1,
+	LTE_LC_MODEM_EVT_RF_CAL_NOT_DONE,
 
 	/**
-	 * Selected CE level in RACH procedure is 2, see 3GPP TS 36.331 for details.
+	 * Invalid band configuration.
+	 *
+	 * The associated payload is the @c lte_lc_modem_evt.invalid_band_conf member of type
+	 * @ref lte_lc_invalid_band_conf in the event.
 	 *
 	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf91x1 >= v2.0.0
+	 *       - mfw_nrf91x1
 	 *       - mfw_nrf9151-ntn
 	 */
-	LTE_LC_MODEM_EVT_CE_LEVEL_2,
+	LTE_LC_MODEM_EVT_INVALID_BAND_CONF,
 
 	/**
-	 * Selected CE level in RACH procedure is 3, see 3GPP TS 36.331 for details.
+	 * Current country the device is operating in.
+	 *
+	 * The associated payload is the @c lte_lc_modem_evt.detected_country member of type
+	 * `uint32_t` in the event. The country is reported as a Mobile Country Code (MCC).
 	 *
 	 * @note This is only supported by the following modem firmware:
-	 *       - mfw_nrf91x1 >= v2.0.0
 	 *       - mfw_nrf9151-ntn
 	 */
-	LTE_LC_MODEM_EVT_CE_LEVEL_3,
+	LTE_LC_MODEM_EVT_DETECTED_COUNTRY
+};
+
+/** Band configuration status. */
+enum lte_lc_band_conf_status {
+	/** Usable bands available in system. */
+	LTE_LC_BAND_CONF_STATUS_OK = 0,
+
+	/** No usable bands available in system. */
+	LTE_LC_BAND_CONF_STATUS_INVALID = 1,
+
+	/** System support not configured. */
+	LTE_LC_BAND_CONF_STATUS_SYSTEM_NOT_SUPPORTED = 2
+};
+
+/** Detected conflicting band lock or operator restrictions. */
+struct lte_lc_invalid_band_conf {
+	/** LTE-M band configuration status. */
+	enum lte_lc_band_conf_status status_ltem;
+
+	/** NB-IoT band configuration status. */
+	enum lte_lc_band_conf_status status_nbiot;
+
+	/** NTN NB-IoT band configuration status. */
+	enum lte_lc_band_conf_status status_ntn_nbiot;
+};
+
+/** Modem domain event.
+ *
+ * This structure is used as the payload for event @ref LTE_LC_EVT_MODEM_EVENT.
+ */
+struct lte_lc_modem_evt {
+	/** Event type. */
+	enum lte_lc_modem_evt_type type;
+
+	/** Payload for the event (optional). */
+	union {
+		/** Payload for event @ref LTE_LC_MODEM_EVT_CE_LEVEL. */
+		enum lte_lc_ce_level ce_level;
+
+		/** Payload for event @ref LTE_LC_MODEM_EVT_INVALID_BAND_CONF. */
+		struct lte_lc_invalid_band_conf invalid_band_conf;
+
+		/**
+		 * Payload for event @ref LTE_LC_MODEM_EVT_DETECTED_COUNTRY.
+		 *
+		 * Mobile Country Code (MCC) for the detected country.
+		 */
+		uint32_t detected_country;
+	};
 };
 
 /** RAI configuration. */
@@ -1052,6 +1135,49 @@ struct lte_lc_ncellmeas_params {
 	uint8_t gci_count;
 };
 
+/** Environment evaluation type. */
+enum lte_lc_env_eval_type {
+	/**
+	 * PLMN search is stopped after light search if any of the PLMNs to evaluate were found.
+	 * Search is continued over all frequency bands if light search did not find any results.
+	 */
+	LTE_LC_ENV_EVAL_TYPE_DYNAMIC = 0,
+
+	/** PLMN search is stopped after light search even if no PLMNs to evaluate were found. */
+	LTE_LC_ENV_EVAL_TYPE_LIGHT = 1,
+
+	/** PLMN search covers all channels in all supported frequency bands. */
+	LTE_LC_ENV_EVAL_TYPE_FULL = 2
+};
+
+/** PLMN to evaluate. */
+struct lte_lc_env_eval_plmn {
+	/** Mobile Country Code (MCC). */
+	int mcc;
+
+	/** Mobile Network Code (MNC). */
+	int mnc;
+};
+
+/** Environment evaluation parameters. */
+struct lte_lc_env_eval_params {
+	/**
+	 * Environment evaluation type.
+	 */
+	enum lte_lc_env_eval_type eval_type;
+
+	/**
+	 * Number of PLMNs to evaluate.
+	 *
+	 * Must be less than or equal to @c CONFIG_LTE_LC_ENV_EVAL_MAX_PLMN_COUNT.
+	 */
+	uint8_t plmn_count;
+
+	/**
+	 * Pointer to an array of PLMNs to evaluate.
+	 */
+	struct lte_lc_env_eval_plmn *plmn_list;
+};
 
 /** Search pattern type. */
 enum lte_lc_periodic_search_pattern_type {
@@ -1214,6 +1340,38 @@ struct lte_lc_periodic_search_cfg {
 	struct lte_lc_periodic_search_pattern patterns[4];
 };
 
+#if defined(CONFIG_LTE_LC_ENV_EVAL_MODULE)
+/**
+ * @brief Environment evaluation results.
+ *
+ * This structure is used as the payload for event @ref LTE_LC_EVT_ENV_EVAL_RESULT.
+ */
+struct lte_lc_env_eval_result {
+	/**
+	 * Status for the environment evaluation.
+	 *
+	 * 0 indicates successful completion of the evaluation.
+	 * 5 indicates that evaluation failed, aborted due to higher priority operation.
+	 * 7 indicates that evaluation failed, unspecified.
+	 */
+	uint8_t status;
+
+	/**
+	 * Number of PLMN results available in the results array.
+	 *
+	 * Range: 0 to CONFIG_LTE_LC_ENV_EVAL_MAX_PLMN_COUNT
+	 */
+	uint8_t result_count;
+
+	/**
+	 * Pointer to an array of environment evaluation results for different PLMNs.
+	 *
+	 * Each entry contains the evaluation result for a specific PLMN.
+	 */
+	struct lte_lc_conn_eval_params *results;
+};
+#endif /* CONFIG_LTE_LC_ENV_EVAL_MODULE */
+
 /** Callback for modem functional mode changes. */
 struct lte_lc_cfun_cb {
 	void (*callback)(enum lte_lc_func_mode, void *ctx);
@@ -1257,7 +1415,7 @@ struct lte_lc_evt {
 #endif /* CONFIG_LTE_LC_MODEM_SLEEP_MODULE */
 
 		/** Payload for event @ref LTE_LC_EVT_MODEM_EVENT. */
-		enum lte_lc_modem_evt modem_evt;
+		struct lte_lc_modem_evt modem_evt;
 
 		/**
 		 * Payload for event @ref LTE_LC_EVT_TAU_PRE_WARNING.
@@ -1275,6 +1433,11 @@ struct lte_lc_evt {
 		/** Payload for event @ref LTE_LC_EVT_RAI_UPDATE. */
 		struct lte_lc_rai_cfg rai_cfg;
 #endif /* CONFIG_LTE_LC_RAI_MODULE */
+
+#if defined(CONFIG_LTE_LC_ENV_EVAL_MODULE)
+		/** Payload for event @ref LTE_LC_EVT_ENV_EVAL_RESULT. */
+		struct lte_lc_env_eval_result env_eval_result;
+#endif /* CONFIG_LTE_LC_ENV_EVAL_MODULE */
 	};
 };
 
@@ -1526,7 +1689,7 @@ int lte_lc_psm_get(int *tau, int *active_time);
  *       `CONFIG_LTE_PROPRIETARY_PSM_REQ` if it is called during modem initialization.
  *
  * @note This is only supported by the following modem firmware:
- *       - mfw_nrf91x1 >= v2.0.0
+ *       - mfw_nrf91x1
  *       - mfw_nrf9151-ntn
  *
  * @note Requires `CONFIG_LTE_LC_PSM_MODULE` to be enabled.
@@ -1698,9 +1861,19 @@ int lte_lc_lte_mode_get(enum lte_lc_lte_mode *mode);
  * event is received, the neighbor cell measurements are automatically stopped. If the
  * function returns successfully, the @ref LTE_LC_EVT_NEIGHBOR_CELL_MEAS event is always reported.
  *
- * @note This is only supported by the following modem firmware:
+ * In receive only functional mode, it is recommended to wait for the modem to complete the network
+ * selection before calling this function. This can be determined from the
+ * @ref LTE_LC_EVT_MODEM_EVENT event with modem event @ref LTE_LC_MODEM_EVT_SEARCH_DONE.
+ *
+ * @note In @ref LTE_LC_FUNC_MODE_NORMAL and @ref LTE_LC_FUNC_MODE_ACTIVATE_LTE functional modes,
+ *       this is only supported by the following modem firmware:
  *       - mfw_nrf9160 >= v1.3.0
  *       - mfw_nrf91x1
+ *       - mfw_nrf9151-ntn
+ *
+ * @note In @ref LTE_LC_FUNC_MODE_RX_ONLY functional mode, this is only supported by the following
+ *       modem firmware:
+ *       - mfw_nrf91x1 >= v2.0.3
  *       - mfw_nrf9151-ntn
  *
  * @note Requires `CONFIG_LTE_LC_NEIGHBOR_CELL_MEAS_MODULE` to be enabled.
@@ -1729,7 +1902,13 @@ int lte_lc_neighbor_cell_measurement_cancel(void);
  * Get connection evaluation parameters.
  *
  * Connection evaluation parameters can be used to determine the energy efficiency of data
- * transmission before the actual data transmission.
+ * transmission before the actual data transmission. Connection evaluation is based on collected
+ * cell history.
+ *
+ * In receive only functional mode with modem firmware mfw_nrf91x1 v2.0.3 and higher, and
+ * mfw_nrf9151-ntn, it is recommended to wait for the modem to complete the network selection
+ * before calling this function. This can be determined from the @ref LTE_LC_EVT_MODEM_EVENT event
+ * with modem event @ref LTE_LC_MODEM_EVT_SEARCH_DONE.
  *
  * @note Requires `CONFIG_LTE_LC_CONN_EVAL_MODULE` to be enabled.
  *
@@ -1753,6 +1932,48 @@ int lte_lc_neighbor_cell_measurement_cancel(void);
  * @retval -EBADMSG if parsing of the AT command response failed.
  */
 int lte_lc_conn_eval_params_get(struct lte_lc_conn_eval_params *params);
+
+/**
+ * Start environment evaluation.
+ *
+ * Perform evaluation for PLMN selection. Evaluates available PLMNs and provides information
+ * of their estimated signalling conditions. Based on the evaluation results, the application
+ * can then select the best PLMN to use. This is useful especially in cases where the device
+ * has multiple SIMs or SIM profiles to select from.
+ *
+ * PLMNs (MCC/MNC pairs) to be evaluated are listed in the @ref lte_lc_env_eval_params
+ * structure. For each PLMN, evaluation results for the best found cell are returned. The results
+ * are returned with the @ref LTE_LC_EVT_ENV_EVAL_RESULT event.
+ *
+ * Environment evaluation can only be performed in receive only functional mode. The device does
+ * not transmit anything during the evaluation.
+ *
+ * @note This is only supported by the following modem firmware:
+ *       - mfw_nrf91x1 >= v2.0.3
+ *       - mfw_nrf9151-ntn
+ *
+ * @note Requires `CONFIG_LTE_LC_ENV_EVAL_MODULE` to be enabled.
+ *
+ * @param[in] params Environment evaluation parameters.
+ *
+ * @retval 0 if environment evaluation was successfully initiated.
+ * @retval -EFAULT if AT command failed or feature is not supported by the modem firmware.
+ * @retval -EINVAL if parameters are invalid.
+ * @retval -EOPNOTSUPP if environment evaluation is not available in the current functional mode.
+ */
+int lte_lc_env_eval(struct lte_lc_env_eval_params *params);
+
+/**
+ * Cancel an ongoing environment evaluation.
+ *
+ * If environment evaluation was in progress, an @ref LTE_LC_EVT_ENV_EVAL_RESULT event is received.
+ *
+ * @note Requires `CONFIG_LTE_LC_ENV_EVAL_MODULE` to be enabled.
+ *
+ * @retval 0 if environment evaluation was cancelled.
+ * @retval -EFAULT if AT command failed.
+ */
+int lte_lc_env_eval_cancel(void);
 
 /**
  * Enable modem domain events.

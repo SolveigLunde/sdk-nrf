@@ -28,7 +28,6 @@
     - nrf7002dk/nrf5340/cpuapp
   comment: "https://nordicsemi.atlassian.net/browse/KRKNWK-20715"
 
-
 - scenarios:
     - nrf.extended.drivers.uart.uart_elementary_dual_l09
     - nrf.extended.drivers.uart.uart_elementary_dual_setup_mismatch_l09
@@ -71,12 +70,6 @@
   comment: "Needs alignment to work with IronSide SE"
 
 - scenarios:
-    - applications.nrf_desktop.*
-  platforms:
-    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
-  comment: "Needs alignment to work with MCUBoot"
-
-- scenarios:
     - drivers.counter.basic_api
   platforms:
     - nrf54h20dk@0.9.0/nrf54h20/cpuapp
@@ -88,3 +81,22 @@
   platforms:
     - nrf54h20dk@0.9.0/nrf54h20/cpuapp
   comment: "https://nordicsemi.atlassian.net/browse/NCSDK-31463"
+
+- scenarios:
+    - sample.nrf7002_eb.thingy53.shell
+  platforms:
+    - thingy53/nrf5340/cpuapp
+  comment: "https://nordicsemi.atlassian.net/browse/NCSDK-35521"
+
+- scenarios:
+    - applications.machine_learning.zrelease
+    - applications.machine_learning.zdebug
+  platforms:
+    - thingy53/nrf5340/cpuapp
+  comment: "https://nordicsemi.atlassian.net/browse/NCSDK-35522"
+
+- scenarios:
+    - applications.machine_learning.zdebug_rtt
+  platforms:
+    - thingy53/nrf5340/cpuapp
+  comment: "https://nordicsemi.atlassian.net/browse/NCSDK-35672"

@@ -8,6 +8,7 @@ import sys
 
 from docutils import statemachine
 from docutils.parsers.rst import directives
+from dotenv import load_dotenv
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
 
@@ -62,6 +63,23 @@ class OptionsFromKconfig(SphinxDirective):
             )
         )
         os.environ["ZEPHYR_BASE"] = str(self.config.options_from_kconfig_zephyr_dir)
+
+        import zephyr_module
+        modules = zephyr_module.parse_modules(os.environ["ZEPHYR_BASE"])
+
+        kconfig_module_dirs = ""
+        for module in modules:
+            kconfig_module_dirs += zephyr_module.process_kconfig_module_dir(module.project,
+                                                                            module.meta,
+                                                                            False)
+
+        import tempfile
+        f = tempfile.NamedTemporaryFile('w', encoding="utf-8", delete=False)
+        f.write(kconfig_module_dirs)
+        f.close()
+        load_dotenv(f.name)
+        os.unlink(f.name)
+
         import kconfiglib
         self._monkey_patch_kconfiglib(kconfiglib)
 

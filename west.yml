@@ -65,7 +65,7 @@ manifest:
     # https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/zephyr/guides/modules.html
     - name: zephyr
       repo-path: sdk-zephyr
-      revision: b2b59e08ca03fe41222a3c3a6cad6fe11529b9c2
+      revision: f7859899ec7dbb21e0580eef25b229bda727f04a
       import:
         # In addition to the zephyr repository itself, NCS also
         # imports the contents of zephyr/west.yml at the above
@@ -128,7 +128,7 @@ manifest:
           compare-by-default: true
     - name: mcuboot
       repo-path: sdk-mcuboot
-      revision: 391f093019ebcf74bf460b1be4120f2816fa9eb9
+      revision: 754f9586875dd72de367704e42c2121eb60696c3
       path: bootloader/mcuboot
     - name: qcbor
       url: https://github.com/laurencelundblade/QCBOR
@@ -137,19 +137,19 @@ manifest:
     - name: mbedtls
       path: modules/crypto/mbedtls
       repo-path: sdk-mbedtls
-      revision: c5115abac477249fab42e61368b8f87c3c9265e1
+      revision: bcce3de6a2860991f54945738c0bc14d2c650ede
     - name: oberon-psa-crypto
       path: modules/crypto/oberon-psa-crypto
       repo-path: sdk-oberon-psa-crypto
-      revision: d682b30a4498ecbaa8992e909b8d8c31f4988956
+      revision: c79b47bcf201b543c20c74dafb32194e3ccc9677
     - name: nrfxlib
       repo-path: sdk-nrfxlib
       path: nrfxlib
-      revision: b492d688f201ecd7880e0898e1b166cd02cc266a
+      revision: 36ba54ade9f72909dff5fc1268eb59eb6e289f2d
     - name: trusted-firmware-m
       repo-path: sdk-trusted-firmware-m
       path: modules/tee/tf-m/trusted-firmware-m
-      revision: 97e79ea61a6572ed56cdd33396ad7546ef9dfb5d
+      revision: b4dfb8e90f7a133a68fd6949bc24586af99a3e0c
     - name: psa-arch-tests
       repo-path: sdk-psa-arch-tests
       path: modules/tee/tf-m/psa-arch-tests
@@ -157,7 +157,7 @@ manifest:
     - name: matter
       repo-path: sdk-connectedhomeip
       path: modules/lib/matter
-      revision: fe650a3ee4948ef1a2edd55a7fe4f6eb561c9e64
+      revision: 4031bf321f9eea476552639dd39d23c90b00d62a
       west-commands: scripts/west/west-commands.yml
       submodules:
         - name: nlio
@@ -176,14 +176,14 @@ manifest:
     - name: nrf-802154
       repo-path: sdk-nrf-802154
       path: nrf-802154
-      revision: 5a34646bdebdddafe5902119ad3c894be7d051ce
+      revision: 0f7ea29d2ae899d52c3dd0ce2355dc4d4176b2b8
       groups:
         - nrf-802154
     - name: dragoon
       # Only for internal Nordic development
       repo-path: dragoon.git
       remote: dragoon
-      revision: 124494f2406783eeeac5cbb33fdceb0c708842c1
+      revision: 17f85a062d59bd6d8693fda3ba20fe5a458b4483
       groups:
         - dragoon
     - name: cjson
@@ -197,7 +197,7 @@ manifest:
           compare-by-default: false
     - name: find-my
       repo-path: sdk-find-my
-      revision: 81777811acaad02e69135e8124cf44835efd6873
+      revision: 472d59ac2917ff6467c96eb418814a35f997037c
       groups:
         - find-my
     - name: azure-sdk-for-c
@@ -219,7 +219,7 @@ manifest:
           upstream-sha: 1be6ca7253133a21a1e9fe0fbb4656e17d63a936
           compare-by-default: false
     - name: libmodem
-      revision: 5dc5bc768dda0ddf9974920c618b70da5d67c6c3
+      revision: e91806dc2b3f1594a2c272cdcfa685cf97618d21
       groups:
         - libmodem
     - name: openthread
@@ -246,7 +246,7 @@ manifest:
       remote: throwtheswitch
     - name: memfault-firmware-sdk
       path: modules/lib/memfault-firmware-sdk
-      revision: 1.28.0
+      revision: 1.30.0
       remote: memfault
     - name: bsim
       repo-path: bsim_west

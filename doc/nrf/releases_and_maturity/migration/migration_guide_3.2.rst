@@ -24,6 +24,24 @@ Required changes
 
 The following changes are mandatory to make your application work in the same way as in previous releases.
 
+nRF54H20
+========
+
+This section describes the changes specific to the nRF54H20 SoC and DK support in the |NCS|.
+
+nRF54H20 SoC binaries
+---------------------
+
+.. toggle::
+
+   * The nRF54H20 SoC binaries based on IronSide SE have been updated to version v23.0.1+16.
+     Starting from the |NCS| v3.2.0, you should always upgrade your nRF54H20 SoC binaries to the latest version.
+
+     For more information, see:
+
+     * :ref:`abi_compatibility` for details about the SoC binaries.
+     * :ref:`ug_nrf54h20_ironside_se_update` for instructions on updating the SoC binaries.
+
 Samples and applications
 ========================
 
@@ -66,7 +84,29 @@ Libraries
 
 This section describes the changes related to libraries.
 
-|no_changes_yet_note|
+.. toggle::
+
+   * :ref:`lte_lc_readme` library:
+
+     * The type of the :c:member:`lte_lc_evt.modem_evt` field has been changed to :c:struct:`lte_lc_modem_evt`.
+       The modem event type can be determined from the :c:member:`lte_lc_modem_evt.type` field.
+       Applications using modem events need to be updated to read the event type from ``modem_evt.type`` instead of ``modem_evt``.
+
+     * Modem events ``LTE_LC_MODEM_EVT_CE_LEVEL_0``, ``LTE_LC_MODEM_EVT_CE_LEVEL_1``, ``LTE_LC_MODEM_EVT_CE_LEVEL_2`` and ``LTE_LC_MODEM_EVT_CE_LEVEL_3`` have been replaced by event :c:enumerator:`LTE_LC_MODEM_EVT_CE_LEVEL`.
+       The CE level can be read from :c:member:`lte_lc_modem_evt.ce_level`.
+
+     * Changed the order of the :c:enumerator:`LTE_LC_MODEM_EVT_SEARCH_DONE` modem event, and registration and cell related events.
+       When the modem has completed the network selection, the registration and cell related events (:c:enumerator:`LTE_LC_EVT_NW_REG_STATUS`, :c:enumerator:`LTE_LC_EVT_CELL_UPDATE`, :c:enumerator:`LTE_LC_EVT_LTE_MODE_UPDATE` and :c:enumerator:`LTE_LC_EVT_PSM_UPDATE`) are sent first, followed by the :c:enumerator:`LTE_LC_MODEM_EVT_SEARCH_DONE` modem event.
+       If the application depends on the order of the events, it may need to be updated.
+
+Trusted Firmware-M
+==================
+
+.. toggle::
+
+   * Trusted Firmware-M changed how data is stored and read in the Protected Storage partition.
+     As a consequence, the applications that build with TF-M (``*/ns`` board targets) and want to perform a firmware upgrade to this |NCS| release will not be able to read the existing Protected Storage data with the default configuration.
+     To enable reading the Protected Storage data from a previous release, make sure that the application enables the :kconfig:option:`CONFIG_TFM_PS_SUPPORT_FORMAT_TRANSITION` Kconfig option.
 
 .. _migration_3.2_recommended:
 
@@ -80,7 +120,14 @@ Samples and applications
 
 This section describes the changes related to samples and applications.
 
-|no_changes_yet_note|
+MCUboot
+-------
+
+The default C library for MCUboot has changed to picolibc.
+Picolibc is recommended over the minimal C library as it is a fully developed and supported C library designed for application usage.
+If you have not explicitly specified the C library in your sysbuild project for MCUboot using either a :file:`sysbuild/mcuboot/prj.conf` file or :file:`sysbuild/mcuboot.conf` file, picolibc will be used by default.
+To set picolibc in your project, use the :kconfig:option:`CONFIG_PICOLIBC` Kconfig option.
+If you need to use the minimal C library (which is not recommended outside of testing scenarios), use the :kconfig:option:`CONFIG_MINIMAL_LIBC` Kconfig option.
 
 Libraries
 =========

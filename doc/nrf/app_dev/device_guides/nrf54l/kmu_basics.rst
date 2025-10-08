@@ -9,12 +9,16 @@ Introduction to KMU key provisioning
 
 .. note::
 
-   The nRF54LM20A SoC currently does not support KMU.
+   The MCUboot bootloader does not yet support KMU for nRF54LM20.
 
 The nRF54L devices are equipped with a Key Management Unit (KMU) that facilitates secure and confidential storage of keys.
 This feature is crucial not only for private keys but also for public keys, as the :ref:`KMU can directly transfer a key to the CRACEN RAM<ug_nrf54l_crypto_kmu_cracen_peripherals>`.
 Even when keys must pass through addressable RAM, the KMU significantly reduces the risk of key exposure.
 Therefore, you should use KMU for managing secrets whenever possible.
+
+When using an nRF54L device with Trusted Firmware-M, you can use the KMU to store keys instead of using the :ref:`ug_tfm_services_its`.
+For this to work, you need to enable the :ref:`tfm_partition_crypto` service, which enables the :ref:`ug_tfm_services_its` service by default.
+You can then manually disable the ITS service and start using KMU instead.
 
 Key Types
 *********

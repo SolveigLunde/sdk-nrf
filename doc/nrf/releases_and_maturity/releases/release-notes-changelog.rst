@@ -36,14 +36,14 @@ IDE, OS, and tool support
 * Added macOS 26 support (Tier 3) to the table listing :ref:`supported operating systems for proprietary tools <additional_nordic_sw_tools_os_support>`.
 * Updated:
 
-  * The required `SEGGER J-Link`_ version to v8.60.
+  * The required `SEGGER J-Link`_ version to v8.66.
   * Steps on the :ref:`install_ncs` page for installing the |NCS| and toolchain together.
     With this change, the separate steps to install the toolchain and the SDK were merged into a single step.
 
 Board support
 =============
 
-|no_changes_yet_note|
+* Added support for the nRF7002-EB II Wi-Fi shield for use with the nRF54LM20 DK board target.
 
 Build and configuration system
 ==============================
@@ -126,8 +126,16 @@ Developing with coprocessors
 Security
 ========
 
-* Added CRACEN and nrf_oberon driver support for nRF54LM20.
-  For the list of supported features and limitations, see the :ref:`ug_crypto_supported_features` page.
+* Added:
+
+  * CRACEN and nrf_oberon driver support for nRF54LM20.
+    For the list of supported features and limitations, see the :ref:`ug_crypto_supported_features` page.
+
+  * Support for disabling Internal Trusted Storage (ITS) on nRF54L series devices when using
+    :kconfig:option:`CONFIG_TFM_PARTITION_CRYPTO` with Trusted Firmware-M (TF-M) through the
+    :kconfig:option:`CONFIG_TFM_PARTITION_INTERNAL_TRUSTED_STORAGE` Kconfig option.
+
+  * Support for AES in counter mode using CRACEN for the :zephyr:board:`nrf54lm20dk`.
 
 Protocols
 =========
@@ -171,7 +179,7 @@ Gazell
 Matter
 ------
 
-|no_changes_yet_note|
+* Updated to using the :kconfig:option:`CONFIG_PICOLIBC` Kconfig option as the C library instead of :kconfig:option:`CONFIG_NEWLIB_LIBC`, in compliance with Zephyr requirements.
 
 Matter fork
 +++++++++++
@@ -186,7 +194,10 @@ nRF IEEE 802.15.4 radio driver
 Thread
 ------
 
-* Updated the :ref:`thread_sed_ssed` documentation to clarify the impact of the SSED configuration on the device's power consumption and provide a guide for :ref:`thread_ssed_fine_tuning` of SSED devices.
+* Updated:
+
+  * The :ref:`thread_sed_ssed` documentation to clarify the impact of the SSED configuration on the device's power consumption and provide a guide for :ref:`thread_ssed_fine_tuning` of SSED devices.
+  * The platform configuration to use the :kconfig:option:`CONFIG_PICOLIBC` Kconfig opiton as the C library instead of :kconfig:option:`CONFIG_NEWLIB_LIBC`, in compliance with Zephyr requirements.
 
 Wi-Fi®
 ------
@@ -219,12 +230,18 @@ Matter bridge
 nRF5340 Audio
 -------------
 
-* Added the API documentation in the header files listed on the :ref:`audio_api` page.
+* Added:
+
+  * The :ref:`Audio application API documentation <audio_api>` page.
+  * The :ref:`config_audio_app_options` page.
+
 * Updated:
 
+  * The power measurements to be disabled by default in ``debug`` builds.
+    To enable power measurements, set the :kconfig:option:`CONFIG_NRF5340_AUDIO_POWER_MEASUREMENT` Kconfig option to ``y`` in the :file:`applications/nrf5340_audio/prj.conf` file.
   * The audio application targeting the :zephyr:board:`nrf5340dk` to use pins **P1.5** to **P1.9** for the I2S interface instead of **P0.13** to **P0.17**.
     This change was made to avoid conflicts with the onboard peripherals on the nRF5340 DK.
-  * The :ref:`Audio application API documentation <audio_api>` page.
+  * The API documentation in the header files listed on the :ref:`audio_api` page.
 
 nRF Desktop
 -----------
@@ -240,6 +257,18 @@ nRF Desktop
       The public key used by MCUboot for validating the application image is securely stored in the KMU hardware peripheral.
       To simplify the programming procedure, the application is configured to use the automatic KMU provisioning.
       The KMU provisioning is performed by the west runner as a part of the ``west flash`` command when the ``--erase`` or ``--recover`` flag is used.
+    * Application configurations to avoid using the deprecated Kconfig options :ref:`CONFIG_DESKTOP_HID_REPORT_EXPIRATION <config_desktop_app_options>` and :ref:`CONFIG_DESKTOP_HID_EVENT_QUEUE_SIZE <config_desktop_app_options>`.
+      The configurations rely on Kconfig options specific to HID providers instead.
+      The HID keypress queue sizes for HID consumer control (:ref:`CONFIG_DESKTOP_HID_REPORT_PROVIDER_CONSUMER_CTRL_EVENT_QUEUE_SIZE <config_desktop_app_options>`) and HID system control (:ref:`CONFIG_DESKTOP_HID_REPORT_PROVIDER_SYSTEM_CTRL_EVENT_QUEUE_SIZE <config_desktop_app_options>`) reports were decreased to ``10``.
+    * Application configurations integrating the USB legacy stack (:ref:`CONFIG_DESKTOP_USB_STACK_LEGACY <config_desktop_app_options>`) to suppress build warnings related to deprecated APIs of the USB legacy stack (:kconfig:option:`CONFIG_USB_DEVICE_STACK`).
+      The configurations enable the :kconfig:option:`CONFIG_DEPRECATION_TEST` Kconfig option to suppress the deprecation warnings.
+      The USB legacy stack is still used by default.
+    * MCUboot configurations that support serial recovery over USB CDC ACM to enable the :kconfig:option:`CONFIG_DEPRECATION_TEST` Kconfig option to suppress deprecation warnings.
+      The implementation of serial recovery over USB CDC ACM still uses the deprecated APIs of the USB legacy stack (:kconfig:option:`CONFIG_USB_DEVICE_STACK`).
+    * Configurations of the ``nrf52840dongle/nrf52840`` board target to align them after the ``bare`` variant of the board was introduced in Zephyr.
+      The application did not switch to the ``bare`` board variant to keep backwards compatibility.
+    * The :ref:`nrf_desktop_hid_state` to allow for delayed registration of HID report providers.
+      Before the change was introduced, subscribing to a HID input report before the respective provider was registered triggered an assertion failure.
 
 nRF Machine Learning (Edge Impulse)
 -----------------------------------
@@ -292,18 +321,32 @@ Bluetooth samples
    * :ref:`peripheral_status`
    * :ref:`peripheral_uart`
 
+* Disabled legacy pairing in the following samples:
+
+   * :ref:`central_nfc_pairing`
+   * :ref:`power_profiling`
+
+   Support for legacy pairing remains exclusively for :ref:`peripheral_nfc_pairing` sample to retain compatibility with older Andorid devices.
+
+* :ref:`direct_test_mode` sample:
+
+  * Updated by simplifying the 2-wire UART polling.
+    This is done by replacing the hardware timer with the ``k_sleep()`` function.
+
 Bluetooth Mesh samples
 ----------------------
 
 * :ref:`ble_mesh_dfu_distributor` sample:
 
-  * Added support for external flash memory for the ``nrf52840dk/nrf52840`` as the secondary partition for the DFU process.
+  * Added support for external flash memory for the ``nrf52840dk/nrf52840`` and the ``nrf54l15dk/nrf54l15/cpuapp`` as the secondary partition for the DFU process.
 
 * :ref:`ble_mesh_dfu_target` sample:
 
-  * Added support for external flash memory for the ``nrf52840dk/nrf52840`` as the secondary partition for the DFU process.
+  * Added support for external flash memory for the ``nrf52840dk/nrf52840`` and the ``nrf54l15dk/nrf54l15/cpuapp`` as the secondary partition for the DFU process.
 
 * :ref:`bluetooth_mesh_sensor_client` sample:
+
+  * Added polling toggle to **Button 1** (**Button 0** on nRF54 DKs) to start/stop the periodic Sensor Get loop, ensuring the functionality is available on all supported devices including single-button hardware.
 
   * Updated:
 
@@ -314,6 +357,12 @@ Bluetooth Mesh samples
       * :ref:`bluetooth_mesh_light_lc`
       * :ref:`bluetooth_mesh_sensor_server`
       * :ref:`bluetooth_mesh_sensor_client`
+
+    * Button functions.
+      Assignments are shifted down one index to accommodate the new polling toggle.
+      The descriptor action has been removed from button actions but is still available through mesh shell commands.
+
+  * Removed support for the ``nrf52dk/nrf52832``, since it does not have enough RAM space after NLC support was added.
 
 Bluetooth Fast Pair samples
 ---------------------------
@@ -360,12 +409,24 @@ Cellular samples
 
 * :ref:`modem_shell_application` sample:
 
-  * Added support for NTN NB-IoT to the ``link sysmode`` and ``link edrx`` commands.
+  * Added:
+
+    * Support for environment evaluation using the ``link enveval`` command.
+    * Support for NTN NB-IoT to the ``link sysmode`` and ``link edrx`` commands.
+
+* :ref:`nrf_cloud_multi_service` sample:
+
+  * Fixed an issue where sporadically the application was stuck waiting for the device to connect to the internet.
+    This was due to wrong :ref:`Connection Manager <zephyr:conn_mgr_overview>` initialization.
 
 Cryptography samples
 --------------------
 
-|no_changes_yet_note|
+* Added the :ref:`crypto_kmu_usage_nrf54l` sample.
+
+* :ref:`crypto_aes_ctr` sample:
+
+  * Added support for ``nrf54lm20dk/nrf54lm20a/cpuapp``.
 
 Debug samples
 -------------
@@ -380,7 +441,10 @@ DECT NR+ samples
 DFU samples
 -----------
 
-* Added the :ref:`dfu_multi_image_sample` sample to demonstrate how to use the :ref:`lib_dfu_target` library.
+* Added:
+
+  * The :ref:`dfu_multi_image_sample` sample to demonstrate how to use the :ref:`lib_dfu_target` library.
+  * The :ref:`ab_sample` sample to demonstrate how to implement the A/B firmware update strategy using :ref:`MCUboot <mcuboot_index_ncs>`.
 
 Edge Impulse samples
 --------------------
@@ -405,7 +469,11 @@ Keys samples
 Matter samples
 --------------
 
-* Added the :ref:`matter_temperature_sensor_sample` sample that demonstrates how to implement and test a Matter temperature sensor device.
+* Added:
+
+  * The :ref:`matter_temperature_sensor_sample` sample that demonstrates how to implement and test a Matter temperature sensor device.
+  * The :ref:`matter_contact_sensor_sample` sample that demonstrates how to implement and test a Matter contact sensor device.
+
 * Updated all Matter over Wi-Fi samples and applications to store a portion of the application code related to the nRF70 Series Wi-Fi firmware in the external flash memory by default.
   This change breaks the DFU between the previous |NCS| versions and the |NCS| v3.2.0.
   To fix this, you need to disable storing the Wi-Fi firmware patch in external memory.
@@ -419,7 +487,15 @@ Matter samples
 Networking samples
 ------------------
 
-|no_changes_yet_note|
+* Added support for the nRF7002-EB II with the ``nrf54lm20dk/nrf54lm20a/cpuapp`` board target in the following samples:
+
+  * :ref:`aws_iot`
+  * :ref:`net_coap_client_sample`
+  * :ref:`download_sample`
+  * :ref:`http_server`
+  * :ref:`https_client`
+  * :ref:`mqtt_sample`
+  * :ref:`udp_sample`
 
 NFC samples
 -----------
@@ -474,7 +550,14 @@ Thread samples
 Wi-Fi samples
 -------------
 
-|no_changes_yet_note|
+* Removed support for the nRF7002-EB II with the ``nrf54h20dk/nrf54h20/cpuapp`` board target from the following samples:
+
+  * :ref:`wifi_station_sample`
+  * :ref:`wifi_scan_sample`
+  * :ref:`wifi_shell_sample`
+  * :ref:`wifi_radio_test`
+  * :ref:`ble_wifi_provision`
+  * :ref:`wifi_provisioning_internal_sample`
 
 Other samples
 -------------
@@ -555,8 +638,19 @@ Modem libraries
 
   * Added:
 
+    * Support for environment evaluation.
     * Support for NTN NB-IoT system mode.
     * eDRX support for NTN NB-IoT.
+    * Support for new modem events :c:enumerator:`LTE_LC_MODEM_EVT_RF_CAL_NOT_DONE`, :c:enumerator:`LTE_LC_MODEM_EVT_INVALID_BAND_CONF`, and :c:enumerator:`LTE_LC_MODEM_EVT_DETECTED_COUNTRY`.
+    * Description of new features supported by mfw_nrf91x1 and mfw_nrf9151-ntn in receive only functional mode.
+    * Sending of the ``LTE_LC_EVT_PSM_UPDATE`` event with ``tau`` and ``active_time`` set to ``-1`` when registration status is ``LTE_LC_NW_REG_NOT_REGISTERED``.
+
+  * Updated:
+
+    * The type of the :c:member:`lte_lc_evt.modem_evt` field to :c:struct:`lte_lc_modem_evt`.
+    * Replaced modem events ``LTE_LC_MODEM_EVT_CE_LEVEL_0``, ``LTE_LC_MODEM_EVT_CE_LEVEL_1``, ``LTE_LC_MODEM_EVT_CE_LEVEL_2`` and ``LTE_LC_MODEM_EVT_CE_LEVEL_3`` with the :c:enumerator:`LTE_LC_MODEM_EVT_CE_LEVEL` modem event.
+    * The order of the ``LTE_LC_MODEM_EVT_SEARCH_DONE`` modem event, and registration and cell related events.
+      See the :ref:`migration guide <migration_3.2_required>` for more information.
 
 Multiprotocol Service Layer libraries
 -------------------------------------
@@ -565,6 +659,11 @@ Multiprotocol Service Layer libraries
 
 Libraries for networking
 ------------------------
+
+* Added missing brackets that caused C++ compilation to fail in the following libraries:
+
+  * :ref:`lib_nrf_cloud_pgps`
+  * :ref:`lib_nrf_cloud_fota`
 
 * Updated the following libraries to use the new ``SEC_TAG_TLS_INVALID`` definition for checking whether a security tag is valid:
 
@@ -588,8 +687,18 @@ Libraries for networking
 
   * Fixed multiple bugs and enhanced error handling.
 
-* Deprecated the :ref:`lib_nrf_cloud_rest` library.
-  Use the :ref:`lib_nrf_cloud_coap` library instead.
+* :ref:`lib_nrf_cloud_rest` library:
+
+  * Deprecated the library.
+    Use the :ref:`lib_nrf_cloud_coap` library instead.
+
+* :ref:`lib_nrf_cloud_fota` library:
+
+  * Fixed occasional message truncation notifying that the download was complete.
+
+* :ref:`lib_nrf_cloud_log` library:
+
+  * Updated by adding a missing CONFIG prefix.
 
 Libraries for NFC
 -----------------
@@ -625,6 +734,7 @@ Scripts
 
   * The :ref:`esb_sniffer_scripts` scripts for the :ref:`esb_monitor` sample.
   * The documentation page for :ref:`nrf_profiler_script`.
+    The page also describes the script for calculating statistics (:file:`calc_stats.py`).
 
 Integrations
 ============
@@ -634,7 +744,8 @@ This section provides detailed lists of changes by :ref:`integration <integratio
 Google Fast Pair integration
 ----------------------------
 
-|no_changes_yet_note|
+* Removed the Fast Pair TinyCrypt cryptographic backend (``CONFIG_BT_FAST_PAIR_CRYPTO_TINYCRYPT``), because the TinyCrypt library support was removed from Zephyr.
+  You can use either the Fast Pair Oberon cryptographic backend (:kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_OBERON`) or the Fast Pair PSA cryptographic backend (:kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_PSA`).
 
 Edge Impulse integration
 ------------------------
@@ -644,7 +755,10 @@ Edge Impulse integration
 Memfault integration
 --------------------
 
-|no_changes_yet_note|
+* Updated:
+
+  * The ``CONFIG_MEMFAULT_DEVICE_INFO_CUSTOM`` Kconfig option has been renamed to :kconfig:option:`CONFIG_MEMFAULT_NCS_DEVICE_INFO_CUSTOM`.
+  * The ``CONFIG_MEMFAULT_DEVICE_INFO_BUILTIN`` Kconfig option has been renamed to :kconfig:option:`CONFIG_MEMFAULT_NCS_DEVICE_INFO_BUILTIN`.
 
 AVSystem integration
 --------------------
@@ -714,7 +828,12 @@ zcbor
 Trusted Firmware-M
 ==================
 
-|no_changes_yet_note|
+* Updated:
+
+  * The TF-M version to 2.2.0.
+  * Documentation to clarify the support for TF-M on devices emulated using the nRF54L15 DK.
+    nRF54L05 does not support TF-M.
+    nRF54L10 supports TF-M experimentally.
 
 Documentation
 =============

@@ -86,6 +86,14 @@ For detailed information on ECIES-X25519 support, refer to the :ref:`ug_nrf54h_e
    On the nRF54H20 SoC, private and public keys are currently stored in the image.
    Embedding keys directly within the firmware image could pose a potential security risk.
 
+Suspend to RAM (S2RAM) support
+******************************
+
+MCUboot on the nRF54H20 SoC supports Suspend to RAM (S2RAM) functionality in the application.
+It can detect a wake-up from S2RAM and redirect execution to the application's resume routine.
+
+For more information, see :ref:`S2RAM operation with MCUboot as the bootloader instruction<ug_nrf54h20_pm_optimizations_bootloader>`.
+
 DFU configuration example
 *************************
 

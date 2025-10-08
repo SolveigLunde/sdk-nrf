@@ -142,7 +142,7 @@ static const struct bt_mesh_sensor_cli_handlers bt_mesh_sensor_cli_handlers = {
 static struct bt_mesh_sensor_cli sensor_cli =
 	BT_MESH_SENSOR_CLI_INIT(&bt_mesh_sensor_cli_handlers);
 
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 /* HVAC Integration NLC Profile composition data page 2 */
 static const uint8_t cmp2_elem_offset_hvac[1]; /* Profile uses element 0 */
 
@@ -165,9 +165,27 @@ static const struct bt_mesh_comp2 comp_p2 = {
 #endif
 
 static struct k_work_delayable get_data_work;
+static bool poll_active;
+
+static void poll_toggle(void)
+{
+	if (poll_active) {
+		poll_active = false;
+		k_work_cancel_delayable(&get_data_work);
+		printk("Sensor polling stopped\n");
+	} else {
+		poll_active = true;
+		k_work_schedule(&get_data_work, K_NO_WAIT);
+		printk("Sensor polling started\n");
+	}
+}
 
 static void get_data(struct k_work *work)
 {
+	if (!poll_active) {
+		return;
+	}
+
 	if (!bt_mesh_is_provisioned()) {
 		k_work_schedule(&get_data_work, K_MSEC(GET_DATA_INTERVAL));
 		return;
@@ -278,6 +296,9 @@ static void button_handler_cb(uint32_t pressed, uint32_t changed)
 	int err;
 
 	if (pressed & changed & BIT(0)) {
+		poll_toggle();
+	}
+	if (pressed & changed & BIT(1)) {
 		err = bt_mesh_sensor_cli_setting_get(&sensor_cli, NULL,
 						     &bt_mesh_sensor_present_dev_op_temp,
 						     &bt_mesh_sensor_dev_op_temp_range_spec, NULL);
@@ -285,7 +306,7 @@ static void button_handler_cb(uint32_t pressed, uint32_t changed)
 			printk("Error getting range setting (%d)\n", err);
 		}
 	}
-	if (pressed & changed & BIT(1)) {
+	if (pressed & changed & BIT(2)) {
 		err = setting_set_int(&bt_mesh_sensor_present_dev_op_temp,
 				      &bt_mesh_sensor_dev_op_temp_range_spec,
 				      temp_ranges[temp_idx++]);
@@ -293,13 +314,6 @@ static void button_handler_cb(uint32_t pressed, uint32_t changed)
 			printk("Error setting range setting (%d)\n", err);
 		}
 		temp_idx = temp_idx % ARRAY_SIZE(temp_ranges);
-	}
-	if (pressed & changed & BIT(2)) {
-		err = bt_mesh_sensor_cli_desc_get(&sensor_cli, NULL,
-						  &bt_mesh_sensor_present_dev_op_temp, NULL);
-		if (err) {
-			printk("Error getting sensor descriptor (%d)\n", err);
-		}
 	}
 	if (pressed & changed & BIT(3)) {
 		err = setting_set_int(&bt_mesh_sensor_presence_detected,
@@ -380,7 +394,7 @@ static const struct bt_mesh_comp comp = {
 
 const struct bt_mesh_comp *model_handler_init(void)
 {
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 	if (bt_mesh_comp2_register(&comp_p2)) {
 		printk("Failed to register comp2\n");
 	}
@@ -391,7 +405,6 @@ const struct bt_mesh_comp *model_handler_init(void)
 	k_work_init_delayable(&motion_timeout_work, motion_timeout);
 
 	dk_button_handler_add(&button_handler);
-	k_work_schedule(&get_data_work, K_MSEC(GET_DATA_INTERVAL));
 
 	return &comp;
 }

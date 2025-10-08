@@ -5,7 +5,7 @@
 #
 
 config PPI_TRACE
-	bool "Enable PPI trace"
+	bool "PPI trace"
 	select NRFX_GPIOTE
 	select NRFX_GPPI
 	select NRFX_PPI if HAS_HW_NRF_PPI
@@ -21,6 +21,6 @@ config PPI_TRACE
 if PPI_TRACE
 module = PPI_TRACE
 module-str = PPI trace
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # PPI_TRACE

@@ -33,18 +33,17 @@ For an overview of the cryptography layer configuration supported for each |NCS|
 Secure processing environment
 *****************************
 
-Depending on the board target, Matter samples can use the :ref:`secure processing environment <ug_tfm_security_by_separation>` with Trusted Firmware-M (TF-M).
+When building for the nRF54L15 DK using the ``nrf54l15dk/nrf54l15/cpuapp/ns`` :ref:`board target <app_boards_names>`, Matter samples can use the :ref:`secure processing environment <ug_tfm_security_by_separation>` with Trusted Firmware-M (TF-M).
+In such cases, all cryptographic operations within the Matter stack are performed by using the `Platform Security Architecture (PSA)`_ API and executed in the secure TF-M environment using the :ref:`TF-M Crypto Service implementation <ug_crypto_architecture_implementation_standards_tfm>`.
+The secure materials like Matter Session keys and other keys (except for the DAC private key) can be stored in the TF-M secure storage using the :ref:`tfm_encrypted_its` or :ref:`key_storage_kmu`.
 
-nRF54L with Trusted Firmware-M (TF-M)
-=====================================
+Matter samples use the full, configurable TF-M build, so you cannot use the minimal build.
+For more information, see :ref:`ug_tfm_supported_services_profiles`.
 
-On the nRF54L SoC, all cryptographic operations within the Matter stack are performed by utilizing the `Platform Security Architecture (PSA)`_ API and executed in the secure TF-M environment using the :ref:`TF-M Crypto Service implementation <ug_crypto_architecture_implementation_standards_tfm>`.
-The secure materials like Matter Session keys and other keys, except for the DAC private key, are stored in the TF-M secure storage using the :ref:`tfm_encrypted_its` module.
-Matter samples use the full TF-M library, so you cannot use the :ref:`tfm_minimal_build` version of TF-M.
+Matter sample partition layout
+==============================
 
-To build a Matter sample with the TF-M support, :ref:`build <building>` for the :ref:`board target <app_boards_names>` with the ``/ns`` variant.
-
-To configure partition layout for your application, you can edit the :file:`pm_static_nrf54l15dk_nrf54l15_cpuapp_ns.yml` file that is available in each sample directory.
+To configure the partition layout for your application, you can edit the :file:`pm_static_nrf54l15dk_nrf54l15_cpuapp_ns.yml` file that is available in each sample directory.
 To read more about the TF-M partitioning, see :ref:`ug_tfm_partition_alignment_requirements`.
 While using TF-M, the application partition size and available RAM space for the application is lower than without TF-M.
 You must keep this in mind and calculate the available space for the application partition.
@@ -352,7 +351,7 @@ If the :kconfig:option:`CONFIG_CHIP_CRYPTO_PSA_DAC_PRIV_KEY_KMU_ENCRYPTED` Kconf
 
 By default, the DAC private key occupies the last slots dedicated for application purposes.
 For the non-encrypted version, it occupies the last two slots (178 and 179), and for the encrypted version, it occupies the last four slots (176-179).
-You can change the default slots by setting the :kconfig:option:`CONFIG_CHIP_CRYPTO_PSA_DAC_PRIV_KEY_KMU_SLOT` Kconfig option to the first slot number of the desired slots, making sure that all slots fit within the possible range.
+You can change the default slots by setting the :kconfig:option:`CONFIG_CHIP_CRYPTO_PSA_DAC_PRIV_KEY_KMU_SLOT_ID` Kconfig option to the first slot number of the desired slots, making sure that all slots fit within the possible range.
 This means you can set it to slot numbers 0-176 for encrypted, or 0-178 for non-encrypted.
 To read more about KMU slots, see the :ref:`ug_nrf54l_crypto_kmu_slots` section of the :ref:`ug_nrf54l_cryptography` page, which details the KMU peripheral.
 

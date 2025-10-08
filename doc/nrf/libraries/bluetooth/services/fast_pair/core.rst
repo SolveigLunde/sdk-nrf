@@ -43,7 +43,7 @@ With the :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option enabled, the follo
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_STORAGE_USER_RESET_ACTION` - The option enables user reset action that is executed together with the Fast Pair factory reset operation.
   See the :ref:`ug_bt_fast_pair_factory_reset_custom_user_reset_action` for more details.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_STORAGE_ACCOUNT_KEY_MAX` - The option configures maximum number of stored Account Keys.
-* :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_TINYCRYPT`, :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_OBERON`, and :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_PSA` - These options are used to select the cryptographic backend for Fast Pair.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_OBERON` and :kconfig:option:`CONFIG_BT_FAST_PAIR_CRYPTO_PSA` - These options are used to select the cryptographic backend for Fast Pair.
   The Oberon backend is used by default.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_BOND_MANAGER` - The option enables the Fast Pair bond management functionality.
   See :ref:`ug_bt_fast_pair_gatt_service_bond_management` for more details.
@@ -96,7 +96,7 @@ With the :kconfig:option:`CONFIG_BT_FAST_PAIR` Kconfig option enabled, the follo
 
     * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_CLOCK_NVM_UPDATE_TIME` - The option configures the time interval (in minutes) of periodic beacon clock writes to the non-volatile memory.
     * :kconfig:option:`CONFIG_BT_FAST_PAIR_FMDN_CLOCK_NVM_UPDATE_RETRY_TIME` - The option configures the retry time (in seconds) when the beacon clock write to the non-volatile memory fails.
-* :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_UNKNOWN`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_INPUT_DEVICE`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_LOCATOR_TAG`and :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_MOUSE` - These options are used to select the Fast Pair use case and configure the Fast Pair library according to the `Fast Pair Device Feature Requirements`_ for the chosen use case.
+* :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_UNKNOWN`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_INPUT_DEVICE`, :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_LOCATOR_TAG` and :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_MOUSE` - These options are used to select the Fast Pair use case and configure the Fast Pair library according to the `Fast Pair Device Feature Requirements`_ for the chosen use case.
   The :kconfig:option:`CONFIG_BT_FAST_PAIR_USE_CASE_UNKNOWN` Kconfig option is used by default.
 * :kconfig:option:`CONFIG_BT_FAST_PAIR_ADV_MANAGER` - The option enables the :ref:`bt_fast_pair_adv_manager_readme` module.
   See the :ref:`bt_fast_pair_adv_manager_config` section to learn more about the remaining Kconfig options of this module.

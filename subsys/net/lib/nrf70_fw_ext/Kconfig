@@ -49,7 +49,7 @@ config NRF_WIFI_FW_FLASH_CHUNK_SIZE
 	  RAM usage (heap) of the application.
 
 config NRF_WIFI_FW_PATCH_INTEGRITY_CHECK
-	bool "Enable integrity check of nRF70 FW patches"
+	bool "Integrity check of nRF70 FW patches"
 	select FLASH_AREA_CHECK_INTEGRITY
 	default y
 	help
@@ -90,5 +90,5 @@ endif
 
 config CUSTOM_LINKER_SCRIPT
 	string "Custom linker script for nRF70 FW patches in external flash"
-	default "${ZEPHYR_BASE}/../nrf/subsys/net/lib/nrf70_fw_ext/rpu_fw_patches.ld"
+	default "$(ZEPHYR_BASE)/../nrf/subsys/net/lib/nrf70_fw_ext/rpu_fw_patches.ld"
 endif

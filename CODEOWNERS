@@ -92,7 +92,6 @@
 /doc/nrf/drivers/bme68x_iaq.rst           @nrfconnect/ncs-cia-doc
 /doc/nrf/drivers/entropy_cc3xx.rst        @nrfconnect/ncs-aegir-doc
 /doc/nrf/drivers/eth_rtt.rst              @nrfconnect/ncs-si-muffin-doc
-/doc/nrf/drivers/images/flash_ipuc/*      @nrfconnect/ncs-charon-doc
 /doc/nrf/drivers/hw_cc3xx.rst             @nrfconnect/ncs-aegir-doc
 /doc/nrf/drivers/mspi_sqspi.rst           @nrfconnect/ncs-lowlevel-doc
 /doc/nrf/drivers/paw3212.rst              @nrfconnect/ncs-si-bluebagel-doc
@@ -356,8 +355,6 @@
 /include/nrf_compress/                    @nordicjm
 /include/nrf_rpc/                         @nrfconnect/ncs-co-drivers @nrfconnect/ncs-si-muffin @nrfconnect/ncs-protocols-serialization
 /include/power/                           @nrfconnect/ncs-co-drivers
-/include/sdfw/                            @nrfconnect/ncs-aurora
-/include/sdfw/sdfw_services/extmem_remote.h @nrfconnect/ncs-charon
 /include/shell/                           @nordic-krch
 /include/util/                            @nrfconnect/ncs-aegir @nordic-krch
 /include/tfm/                             @nrfconnect/ncs-aegir
@@ -505,6 +502,7 @@
 /samples/debug/ppi_trace/                 @nordic-krch
 /samples/dect/dect_phy/dect_shell/        @nrfconnect/ncs-modem-tre
 /samples/dect/dect_phy/hello_dect/        @nrfconnect/ncs-modem
+/samples/dfu/ab/                          @nrfconnect/ncs-charon
 /samples/dfu/dfu_target/                  @nrfconnect/ncs-charon
 /samples/dfu/dfu_multi_image/             @nrfconnect/ncs-charon
 /samples/edge_impulse/                    @nrfconnect/ncs-si-muffin
@@ -630,6 +628,7 @@
 /samples/debug/ppi_trace/*.rst            @nrfconnect/ncs-doc-leads
 /samples/dect/dect_phy/dect_shell/*.rst   @nrfconnect/ncs-iot-positioning-doc
 /samples/dect/dect_phy/hello_dect/*.rst   @nrfconnect/ncs-modem-doc
+/samples/dfu/ab/*.rst                     @nrfconnect/ncs-charon-doc
 /samples/dfu/dfu_target/*.rst             @nrfconnect/ncs-charon-doc
 /samples/dfu/dfu_multi_image/*.rst        @nrfconnect/ncs-charon-doc
 /samples/esb/**/*.rst                     @nrfconnect/ncs-si-muffin-doc
@@ -664,11 +663,12 @@
 /samples/wifi/**/*.rst                    @nrfconnect/ncs-wifi-doc
 /samples/wifi/provisioning/softap/*.rst   @nrfconnect/ncs-cia-doc
 /samples/zephyr/basic/blinky/             @nrfconnect/ncs-low-level-test @nrfconnect/ncs-ll-ursus
+/samples/zephyr/bluetooth/                @nrfconnect/ncs-low-level-test
 /samples/zephyr/boards/nordic/spis_wakeup/ @nrfconnect/ncs-low-level-test
 /samples/zephyr/boards/nordic/system_off/ @nrfconnect/ncs-low-level-test
 /samples/zephyr/drivers/adc/              @nrfconnect/ncs-low-level-test
-/samples/zephyr/drivers/counter/          @nrfconnect/ncs-low-level-test
 /samples/zephyr/drivers/audio/dmic/       @nrfconnect/ncs-low-level-test
+/samples/zephyr/drivers/counter/          @nrfconnect/ncs-low-level-test
 /samples/zephyr/drivers/i2c/rtio_loopback/ @nrfconnect/ncs-low-level-test
 /samples/zephyr/drivers/jesd216/          @nrfconnect/ncs-low-level-test
 /samples/zephyr/drivers/mbox/             @nrfconnect/ncs-low-level-test
@@ -679,9 +679,11 @@
 /samples/zephyr/sensor/bme680/            @nrfconnect/ncs-low-level-test
 /samples/zephyr/sensor/qdec/              @nrfconnect/ncs-low-level-test
 /samples/zephyr/smp_svr_mini_boot/        @nrfconnect/ncs-pluto @nrfconnect/ncs-charon
+/samples/zephyr/subsys/ipc/               @nrfconnect/ncs-low-level-test
+/samples/zephyr/subsys/mgmt/mcumgr/smp_svr/ @nrfconnect/ncs-charon
 /samples/zephyr/subsys/settings/          @nrfconnect/ncs-low-level-test
 /samples/zephyr/subsys/usb/               @nrfconnect/ncs-low-level-test
-/samples/zephyr/subsys/mgmt/mcumgr/smp_svr/ @nrfconnect/ncs-charon
+/samples/zephyr/sysbuild/                 @nrfconnect/ncs-low-level-test
 
 /samples/**/*.svg                         @nrfconnect/ncs-doc-leads
 /samples/**/*.png                         @nrfconnect/ncs-doc-leads
@@ -739,7 +741,6 @@
 /snippets/hw-flow-control/                @nrfconnect/ncs-low-level-test @miha-nordic
 /snippets/matter-diagnostic-logs/         @nrfconnect/ncs-matter
 /snippets/matter-debug/                   @nrfconnect/ncs-matter
-/snippets/matter-power-consumption-tests/ @nrfconnect/ncs-matter
 /snippets/nordic-bt-rpc/                  @ppryga-nordic
 /snippets/nrf70-driver-debug/             @krish2718 @sachinthegreen
 /snippets/nrf70-driver-verbose-debug/     @krish2718 @sachinthegreen
@@ -784,6 +785,7 @@
 /subsys/debug/                            @nordic-krch
 /subsys/debug/coredump/                   @nrfconnect/ncs-protocols-serialization
 /subsys/dfu/                              @nrfconnect/ncs-pluto
+/subsys/dfu/dfu_target/                   @nrfconnect/ncs-pluto @nrfconnect/ncs-charon
 /subsys/dfu/dfu_multi_image/              @Damian-Nordic @nrfconnect/ncs-charon
 /subsys/dm/                               @nrfconnect/ncs-si-muffin
 /subsys/dult/                             @nrfconnect/ncs-si-bluebagel
@@ -824,10 +826,8 @@
 /subsys/nrf_security/                     @nrfconnect/ncs-aegir
 /subsys/partition_manager/                @nordicjm @tejlmand
 /subsys/pcd/                              @nrfconnect/ncs-pluto
-/subsys/sdfw_services/                    @nrfconnect/ncs-aurora
 /subsys/secure_storage/                   @nrfconnect/ncs-aegir
 /subsys/settings/                         @nrfconnect/ncs-pluto @rghaddab
-/subsys/sdfw_services/services/extmem/    @nrfconnect/ncs-charon
 /subsys/shell/                            @nordic-krch
 /subsys/trusted_storage/                  @nrfconnect/ncs-aegir
 /subsys/uart_async_adapter/               @nrfconnect/ncs-si-muffin
@@ -942,6 +942,8 @@
 /tests/subsys/partition_manager/region/   @nordicjm @tejlmand
 /tests/subsys/partition_manager/static_pm_file/ @nordicjm @tejlmand
 /tests/subsys/pcd/                        @nrfconnect/ncs-pluto
+/tests/subsys/rtt/                        @nrfconnect/ncs-low-level-test
+/tests/subsys/swo/                        @nrfconnect/ncs-low-level-test
 /tests/subsys/usb/negotiated_speed/       @nrfconnect/ncs-low-level-test
 /tests/subsys/ipc/                        @nrfconnect/ncs-low-level-test
 /tests/tfm/                               @nrfconnect/ncs-aegir @magnev
