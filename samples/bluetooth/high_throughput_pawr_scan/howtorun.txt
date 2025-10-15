@@ -1,0 +1,63 @@
+Step-by-step how to run the sample on physical dks: 
+-----------------------------------------------------
+
+Step 1. connecting DKs
+
+Connect the DKs to the computer
+To get access to the DK from wsl follow this quide: https://github.com/balaji-srin/nrf-wsl-guide/tree/main#readme
+
+Step 2. In wsl
+
+confirm dk ids and ports
+Go to docker -> run nrfjprog --com 
+Note the comms as you could use this in step 5
+
+If you do not have nrfjprog download it (but should be in the docker image)
+
+Step 3. Build sample from folder
+
+```bash
+    #Advertiser: 
+    west build -p always nrf54l15dk/nrf54l15/cpuapp 
+
+    #Sync scanner: 
+    west build -p always nrf54l15dk/nrf54l15/cpuapp
+```
+
+Note: remember to set the number of devices in prj.conf before building the advertiser
+
+Step 4. Flash roles to the DKs
+
+```bash
+    #Advertiser
+    west flash -d periodic_adv_rsp/build --srn <id-number>
+
+    #Sync scanners (repeat for number of devices. Remember to change id)
+    west flash -d periodic_sync_rsp/build --srn <id-number>
+
+    #Example: 
+    west flash -d periodic_adv_rsp/build --srn 1057716157
+```
+
+Step 5. View logs
+
+Open one terminal for each device (sync + adv) and go into docker
+    ```bash
+    # Example: DK 1057716157 (VCOM0)
+    /bin/stty -F /dev/ttyACM0 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM0
+    ```
+    ```bash
+    # DK 1057717549 (VCOM0)
+    /bin/stty -F /dev/ttyACM2 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM2
+    ```
+    ```bash
+    # DK 1057785361 (VCOM0)
+    /bin/stty -F /dev/ttyACM4 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM4
+    ```
+Press the DK’s reset button after connecting.
+If a VCOM0 is silent, try that DK’s VCOM1 (`/dev/ttyACM1`, `/dev/ttyACM3`, `/dev/ttyACM5`) at 115200. Or just try all the com from step 2
+Exit with Ctrl-C.
+

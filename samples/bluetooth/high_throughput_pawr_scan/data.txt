@@ -139,3 +139,20 @@ Removed extra slot units for higher numer of configs (another safety thing):
 [PAwR] received 119072 bytes (116 KB) in 1001 ms at 951 kbps    <---- beste jeg har fått til generelt! 
 [PAwR] theoretical ~954 kbps; efficiency ~99% (N=128, payload=247, AdvInt=265.00 ms)
 
+
+
+
+Dette er fra throughput sampleet, 2 enheter vanlig bluetooth connctions. 
+[local] sent 1242945 bytes (1213 KB) in 7292 ms at 1363 kbps
+[peer] received 1242945 bytes (1213 KB) in 2511 GATT writes at 1415583 bps
+
+
+Testing with real dks (1 device = 1 synchroniser): 
+
+1 device: 
+[PAwR] received 21960 bytes (21 KB) in 1001 ms at 175 kbps
+[PAwR] theoretical ~175 kbps; efficiency ~100% (N=1, payload=247, AdvInt=11.25 ms)
+
+2 devices: 
+[PAwR] received 39528 bytes (38 KB) in 1002 ms at 315 kbps
+[PAwR] theoretical ~316 kbps; efficiency ~99% (N=2, payload=247, AdvInt=12.50 ms)

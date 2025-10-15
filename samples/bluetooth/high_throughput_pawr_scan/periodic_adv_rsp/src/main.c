@@ -410,6 +410,7 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 				       (unsigned int)(g_adv_event_ms_x100_print / 100U),
 				       (unsigned int)(g_adv_event_ms_x100_print % 100U));
 			}
+            /*
 			FILE *log = fopen("throughput.log", "a");
 			if (log) {
 				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n", total_bytes,
@@ -424,6 +425,7 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 				}
 				fclose(log);
 			}
+            */
             total_bytes = 0;
         }
 
