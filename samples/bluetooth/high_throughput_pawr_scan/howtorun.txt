@@ -1,6 +1,13 @@
 Step-by-step how to run the sample on physical dks: 
 -----------------------------------------------------
 
+First, some small alterations that might need to be made: 
+
+In prj.conf (both sync and adv) uncomment the last lines of code if it is commented out. 
+It can be there for simulations in bsim as well but it just gave a lot more prints making it look a bit messy. 
+Also remember to set the number of devices to the amout you acctually have, it will just freeze if you forget and its annoying to have to rebuild everything.
+
+-----------------------------------------------------
 Step 1. connecting DKs
 
 Connect the DKs to the computer
@@ -18,10 +25,10 @@ Step 3. Build sample from folder
 
 ```bash
     #Advertiser: 
-    west build -p always nrf54l15dk/nrf54l15/cpuapp 
+    west build -p always -b nrf54l15dk/nrf54l15/cpuapp 
 
     #Sync scanner: 
-    west build -p always nrf54l15dk/nrf54l15/cpuapp
+    west build -p always -b nrf54l15dk/nrf54l15/cpuapp
 ```
 
 Note: remember to set the number of devices in prj.conf before building the advertiser
@@ -30,13 +37,13 @@ Step 4. Flash roles to the DKs
 
 ```bash
     #Advertiser
-    west flash -d periodic_adv_rsp/build --srn <id-number>
+    west flash -d periodic_adv_rsp/build --snr <id-number>
 
     #Sync scanners (repeat for number of devices. Remember to change id)
-    west flash -d periodic_sync_rsp/build --srn <id-number>
+    west flash -d periodic_sync_rsp/build --snr <id-number>
 
     #Example: 
-    west flash -d periodic_adv_rsp/build --srn 1057716157
+    west flash -d periodic_adv_rsp/build --snr 1057716157
 ```
 
 Step 5. View logs

@@ -10,12 +10,9 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/random/random.h>
 
-#define NAME_LEN 30
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 
-// Dynamic device count - will be set by advertiser
 static uint16_t actual_device_count = 0;
-// Dynamic response size based on optimal calculation
 static uint16_t dynamic_rsp_size = 0;
 
 

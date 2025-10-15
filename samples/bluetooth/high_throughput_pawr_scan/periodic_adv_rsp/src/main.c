@@ -25,7 +25,6 @@
 #define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
-#define NAME_LEN      30
 
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define THROUGHPUT_PRINT_INTERVAL 1000 
@@ -49,7 +48,7 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     const float SAFETY_MARGIN_MS = 0.0f;                  /* extra guard for join/sync, increase if needed */
     const float ADVERTISER_GUARD_MS = 1.0f;               /* end-of-event guard, increase if needed*/
     const uint8_t PHY_RATE_MBPS = 2;                      /* assume 2M PHY */
-    const float SLOT_GUARD_TIME_MS = 0.5f;                /* per-slot guard */
+    const float SLOT_GUARD_TIME_MS = 0.0f;                /* per-slot guard */
 
     /* Max per-slot payload for PAwR responses */
     const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; 
@@ -166,16 +165,6 @@ struct ack_entry {
 static struct ack_entry ack_queue[MAX_ACKS_PER_EVENT];
 static uint8_t ack_queue_count;
 
-static uint16_t compute_open_slots_bitmap(void)
-{
-    uint16_t bitmap = 0;
-    for (int i = 0; i < NUM_RSP_SLOTS && i < 16; i++) {
-        if (!slot_state[i].assigned) {
-            bitmap |= (1U << i);
-        }
-    }
-    return bitmap;
-}
 
 static void build_open_slots_bitmap(uint8_t *out, uint8_t bytes)
 {
@@ -410,22 +399,6 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 				       (unsigned int)(g_adv_event_ms_x100_print / 100U),
 				       (unsigned int)(g_adv_event_ms_x100_print % 100U));
 			}
-            /*
-			FILE *log = fopen("throughput.log", "a");
-			if (log) {
-				fprintf(log, "\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n", total_bytes,
-					total_bytes / 1024, delta, measured_kbps);
-				if (g_adv_event_ms_x100_print > 0 && g_num_rsp_slots_print > 0) {
-					uint32_t theo_kbps = (uint32_t)(((uint64_t)g_num_rsp_slots_print * g_payload_size_print * 8ULL * 100000ULL) /
-										(uint64_t)g_adv_event_ms_x100_print) / 1000U;
-					uint32_t eff = (theo_kbps > 0) ? (uint32_t)((measured_kbps * 100ULL) / theo_kbps) : 0U;
-					fprintf(log, "[PAwR] theoretical ~%u kbps; efficiency ~%u%% (N=%u, payload=%u, AdvInt=%u.%02u ms)\n",
-							theo_kbps, eff, g_num_rsp_slots_print, g_payload_size_print,
-							(unsigned int)(g_adv_event_ms_x100_print / 100U), (unsigned int)(g_adv_event_ms_x100_print % 100U));
-				}
-				fclose(log);
-			}
-            */
             total_bytes = 0;
         }
 
@@ -459,7 +432,6 @@ void init_bufs(void)
 }
 
 #define MAX_SYNCS (NUM_SUBEVENTS * NUM_RSP_SLOTS)
-/* Total devices is implied by NUM_RSP_SLOTS; claim/ack manages assignment */
 
 int main(void)
 {
@@ -512,10 +484,6 @@ int main(void)
 		return 0;
 	}
 
-    /*
-     * With claim/ack, no onboarding loop or connections are needed.
-     * The advertiser runs indefinitely, allowing devices to claim slots.
-     */
     while (true) {
         k_sleep(K_SECONDS(1));
     }
