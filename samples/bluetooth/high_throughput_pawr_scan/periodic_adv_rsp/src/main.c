@@ -55,15 +55,12 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
     const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f); /* ~0.988 ms */
-    const float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);
+    const float slot_time_ms = tx_time_ms + 0.25f; //old: const float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);
 
     /* Convert per-slot time to spacing in 0.125 ms units, clamp per API (0.25..31.875 ms) */
-    uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);
-    if (slot_spacing_units > 255) {
-        slot_spacing_units = 255;
-    }
+    uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);// olduint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);if (slot_spacing_units > 255) {    slot_spacing_units = 255;}
 
-    const uint8_t delay_units = MIN_RESPONSE_SLOT_DELAY_UNITS; /* 1.25 ms units */
+    const uint8_t delay_units = 3; //old line: MIN_RESPONSE_SLOT_DELAY_UNITS; /* 1.25 ms units */
 
     /* Duration of a single subevent must accommodate all response slots.
      * Convert spacing (0.125 ms units) into 1.25 ms units when computing subevent_interval.
@@ -402,8 +399,8 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
             total_bytes = 0;
         }
 
-        printk("Response: subevent %d, slot %d, size %d bytes\n", 
-               info->subevent, info->response_slot, buf->len);
+        // printk("Response: subevent %d, slot %d, size %d bytes\n", 
+        //        info->subevent, info->response_slot, buf->len);
     }
 }
 

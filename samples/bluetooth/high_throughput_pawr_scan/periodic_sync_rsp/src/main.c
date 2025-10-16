@@ -253,9 +253,9 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
             rsp_params.response_subevent = info->subevent;
             rsp_params.response_slot = assigned_slot;
 
-            printk("Indication: subevent %d, responding in slot %d with %d bytes%s\n",
-                   info->subevent, assigned_slot, rsp_buf.len,
-                   should_retransmit ? " (retransmit)" : "");
+            // printk("Indication: subevent %d, responding in slot %d with %d bytes%s\n",
+            //        info->subevent, assigned_slot, rsp_buf.len,
+            //        should_retransmit ? " (retransmit)" : "");
 
             int err3 = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
             if (err3) {
@@ -291,7 +291,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
     struct bt_le_per_adv_sync_param param = {0};
     bt_addr_le_copy(&param.addr, info->addr);
     param.sid = info->sid;
-    param.skip = 1;
+    param.skip = 0; //CHANGED
     param.timeout = 1000; /* 10s */
 
     int err = bt_le_per_adv_sync_create(&param, &default_sync);
