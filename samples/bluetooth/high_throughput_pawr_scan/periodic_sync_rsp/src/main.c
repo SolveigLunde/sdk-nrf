@@ -15,20 +15,6 @@
 static uint16_t actual_device_count = 0;
 static uint16_t dynamic_rsp_size = 0;
 
-
-// Calculate optimal response size based on actual device count from advertiser
-static uint16_t calculate_optimal_response_size(uint16_t device_count) {
-    if (device_count == 0) {
-        device_count = 16; // Fallback only if not set
-    }
-    
-    // Always use maximum PDU size
-    uint16_t optimal_size = MAX_INDIVIDUAL_RESPONSE_SIZE - 3; // Hvis du går opp til 247 får jeg 3 byte overhead (som ga lav throughput). Enkel fiks var bare å ta -3. 
-    printk("Using maximum PDU size: %u bytes\n", optimal_size);
-    
-    return optimal_size;
-}
-
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
 static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
@@ -73,16 +59,10 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
                    const struct bt_le_per_adv_sync_term_info *info)
 {
     char le_addr[BT_ADDR_LE_STR_LEN];
-
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-
-
     default_sync = NULL;
-
     k_sem_give(&sem_per_sync_lost);
 }
-
-
 
 static struct bt_le_per_adv_response_params rsp_params;
 
@@ -95,7 +75,7 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
 
     // Initialize dynamic response size if not set
     if (dynamic_rsp_size == 0) {
-        dynamic_rsp_size = calculate_optimal_response_size(actual_device_count);
+        dynamic_rsp_size = MAX_INDIVIDUAL_RESPONSE_SIZE - 3;
         if (actual_device_count > 0) {
             printk("Responder using dynamic response size: %d bytes\n", dynamic_rsp_size);
             printk("Configured for %d devices = %d bytes total\n", 
@@ -107,12 +87,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
     }
 
     if (buf && buf->len) {
-        /* Parse control frame from advertiser (MSD):
-         * [len][type=MSD][company_id(2)][ver(1)][flags(1)]
-         * [open_len(1)][open_len bytes of bitmap]
-         * [ack_count(1)][ack_count * {token(4), slot(1)}]
-         * [rt_len(1)][retransmit_bitmap(rt_len)]
-         */
         uint8_t open_len = 0;
         uint8_t open_bitmap[32]; /* supports up to 256 slots; grows if needed */
         memset(open_bitmap, 0, sizeof(open_bitmap));
@@ -253,10 +227,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
             rsp_params.response_subevent = info->subevent;
             rsp_params.response_slot = assigned_slot;
 
-            // printk("Indication: subevent %d, responding in slot %d with %d bytes%s\n",
-            //        info->subevent, assigned_slot, rsp_buf.len,
-            //        should_retransmit ? " (retransmit)" : "");
-
             int err3 = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
             if (err3) {
                 printk("Failed to send response (err %d)\n", err3);
@@ -291,7 +261,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
     struct bt_le_per_adv_sync_param param = {0};
     bt_addr_le_copy(&param.addr, info->addr);
     param.sid = info->sid;
-    param.skip = 0; //CHANGED
+    param.skip = 0; 
     param.timeout = 1000; /* 10s */
 
     int err = bt_le_per_adv_sync_create(&param, &default_sync);

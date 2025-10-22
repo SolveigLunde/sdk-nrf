@@ -36,51 +36,41 @@ static uint64_t stamp;
 static uint16_t g_num_rsp_slots_print;
 static uint16_t g_payload_size_print;
 static uint32_t g_adv_event_ms_x100_print;
-static uint32_t g_theoretical_kbps;
  
 
-// I have altered this function to calculate optimal parameters and tuned the parameters manually :) 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
     /* BLE spec / Zephyr API constraints (see bt_le_per_adv_param docs) */
-    const uint8_t MIN_RESPONSE_SLOT_DELAY_UNITS = 6;      /* 6 * 1.25 ms = 7.5 ms */
     const uint16_t MIN_PAWR_INTERVAL_MS = 1;             /* increase lower bound for stability if needed */
-    const float SAFETY_MARGIN_MS = 0.0f;                  /* extra guard for join/sync, increase if needed */
-    const float ADVERTISER_GUARD_MS = 1.0f;               /* end-of-event guard, increase if needed*/
-    const uint8_t PHY_RATE_MBPS = 2;                      /* assume 2M PHY */
-    const float SLOT_GUARD_TIME_MS = 0.0f;                /* per-slot guard */
+    const float ADVERTISER_GUARD_MS = 1.0f;              /* end-of-event guard, increase if needed*/
+    const uint8_t PHY_RATE_MBPS = 2;         
 
     /* Max per-slot payload for PAwR responses */
     const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; 
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
-    const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f); /* ~0.988 ms */
-    const float slot_time_ms = tx_time_ms + 0.25f; //old: const float slot_time_ms = fmaxf(tx_time_ms * 1.2f + SLOT_GUARD_TIME_MS, 2.0f);
+    const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f);
+    const float slot_time_ms = tx_time_ms + 0.25f; 
 
     /* Convert per-slot time to spacing in 0.125 ms units, clamp per API (0.25..31.875 ms) */
-    uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);// olduint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);if (slot_spacing_units > 255) {    slot_spacing_units = 255;}
+    uint16_t slot_spacing_units = (uint16_t)ceilf(slot_time_ms / 0.125f);
 
-    const uint8_t delay_units = 3; //old line: MIN_RESPONSE_SLOT_DELAY_UNITS; /* 1.25 ms units */
+    const uint8_t delay_units = 3;
 
-    /* Duration of a single subevent must accommodate all response slots.
-     * Convert spacing (0.125 ms units) into 1.25 ms units when computing subevent_interval.
-     */
     const uint32_t subevent_duration_ms_x100 = (uint32_t)delay_units * 125U +
                                                (uint32_t)num_response_slots * ((uint32_t)slot_spacing_units * 125U / 10U);
-    /* subevent_interval is in 1.25 ms units, 7.5..318.75 ms (6..255 units). */
+    
     uint16_t subevent_interval_units = (uint16_t)((subevent_duration_ms_x100 + 125U - 1U) / 125U);
     if (subevent_interval_units < 6) {
         subevent_interval_units = 6;
     } else if (subevent_interval_units > 255) {
-        /* Too many slots at this spacing to fit in one subevent window. Keep max allowed and warn. */
         subevent_interval_units = 255;
         printk("Warning: subevent too long for one window; consider fewer devices or smaller payload.\n");
     }
 
-    /* Full periodic advertising event budget in 1/100 ms to avoid floats */
     const uint32_t total_event_time_ms_x100 = (uint32_t)delay_units * 125U +
                                               (uint32_t)num_response_slots * ((uint32_t)slot_spacing_units * 125U / 10U) +
-                                              (uint32_t)((ADVERTISER_GUARD_MS + SAFETY_MARGIN_MS) * 100.0f);
+                                              (uint32_t)((ADVERTISER_GUARD_MS) * 100.0f);
 
     const uint16_t min_interval_units = (uint16_t)((MIN_PAWR_INTERVAL_MS + 1) / 1.25f); /* small bias upward */
     const uint16_t required_interval_units = (uint16_t)((total_event_time_ms_x100 + 125U - 1U) / 125U);
@@ -113,7 +103,7 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
 	g_num_rsp_slots_print = num_response_slots;
 	g_payload_size_print = packet_size;
 	g_adv_event_ms_x100_print = adv_event_ms_x100;
-	g_theoretical_kbps = est_throughput_kbps;
+	
 
     printk("PAwR config (1 subevent):\n");
     printk("  Devices: %u, Resp size: %u B, Slot: %u.%02u ms\n",
@@ -260,16 +250,8 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
     // Process each subevent
     for (size_t i = 0; i < to_send; i++) {
         buf = &bufs[i];
-        
-        // Reset buffer for each request
         net_buf_simple_reset(buf);
         
-        /*
-         * Add manufacturer specific control frame:
-         * [len][type=MSD][company_id(2)][ver(1)][flags(1)]
-         * [open_slots_bitmap(2)][ack_count(1)][acks...]
-         * [rt_len(1)][retransmit_bitmap(rt_len)]
-         */
         uint8_t *length_field = net_buf_simple_add(buf, 1);
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
@@ -278,7 +260,7 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         net_buf_simple_add_u8(buf, 0x01); // version
         net_buf_simple_add_u8(buf, 0x00); // flags
 
-        /* Open slots bitmap (variable length, hard clamp to 32 bytes to keep control small) */
+        /* Open slots bitmap */
         uint8_t open_len_full = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
         uint8_t open_len = open_len_full > 32 ? 32 : open_len_full;
         uint8_t tmp_open[32];
@@ -383,8 +365,10 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 			uint64_t measured_kbps = (delta > 0) ? (((uint64_t)total_bytes * 8ULL) / (uint64_t)delta) : 0ULL;
 			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
 			   total_bytes, total_bytes / 1024, delta, measured_kbps);
+
 			/* Context lines: theoretical and efficiency (avoid divide by zero) */
 			if (g_adv_event_ms_x100_print > 0 && g_num_rsp_slots_print > 0) {
+
 				/* Recompute theoretical in case config changed mid-run */
 				uint32_t theo_kbps = (uint32_t)(((uint64_t)g_num_rsp_slots_print * g_payload_size_print * 8ULL * 100000ULL) /
 									(uint64_t)g_adv_event_ms_x100_print) / 1000U;
@@ -398,9 +382,6 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
 			}
             total_bytes = 0;
         }
-
-        // printk("Response: subevent %d, slot %d, size %d bytes\n", 
-        //        info->subevent, info->response_slot, buf->len);
     }
 }
 
@@ -427,8 +408,6 @@ void init_bufs(void)
 		printk("Buffer %d initialized with len %d\n", i, bufs[i].len);
 	}
 }
-
-#define MAX_SYNCS (NUM_SUBEVENTS * NUM_RSP_SLOTS)
 
 int main(void)
 {

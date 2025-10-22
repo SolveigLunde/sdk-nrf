@@ -5,7 +5,7 @@ This sample demonstrates one-to-many uplink using Bluetooth LE Periodic Advertis
 - `periodic_sync_rsp`: PAwR synchronizer/responder that joins a periodic advertiser and transmits data in assigned response slots.
 
 ### What it showcases
-- One-to-many uplink using PAwR with a lightweight join/claim protocol (no GATT, no PAST).
+- One-to-many uplink using PAwR with a lightweight join/claim protocol.
 - Claim/ACK handshake to assign response slots, bitmap-driven retransmission, and idle-slot reclamation.
 - Real-time throughput measurements and theoretical capacity reporting on the advertiser.
 - Tested at high device counts (100+ responders) with 2M PHY.
@@ -107,11 +107,12 @@ Responder payload size (`periodic_sync_rsp/src/main.c`):
 ## Measured results (excerpt)
 See `data.txt` for the full set. Representative measurements (advertiser prints):
 - 1 device: ~175 kbps
-- 2 devices: ~315 kbps
-- 5 devices: ~525 kbps after tuning
-- 64 devices: ~913 kbps (tuned)
-- 128 devices: ~951 kbps (tuned)
-- 140–155 devices: increased timing pressure; efficiencies ~80–90%, with instability beyond ~155 in the provided tuning.
+- 2 devices: ~521 kbps
+- 5 devices: ~869 kbps 
+- 32 devices: ~1337 kbps 
+- 64 devices: ~1470 kbps 
+- 128 devices: ~1517 kbps 
+- 130–155 devices: increased timing pressure; efficiencies ~80–90%, with instability beyond ~128 in the provided tuning.
 
 Actual throughput depends on radio conditions, controller limits, and timing parameters. Increase safety margins or reduce N if you observe missed indications.
 

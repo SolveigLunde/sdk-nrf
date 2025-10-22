@@ -170,3 +170,37 @@ Testing with real dks (1 device = 1 synchroniser):
 2 devices: 
 [PAwR] received 39528 bytes (38 KB) in 1002 ms at 315 kbps
 [PAwR] theoretical ~316 kbps; efficiency ~99% (N=2, payload=247, AdvInt=12.50 ms)
+
+-----------------------------------Latest tuning (22.10.2025)-----------------------------------------------
+
+20 devices: 
+[PAwR] received 163480 bytes (159 KB) in 1001 ms at 1306 kbps
+[PAwR] theoretical ~1317 kbps; efficiency ~99% (N=20, payload=247, AdvInt=30.00 ms)
+
+64 devices: 
+[PAwR] received 184952 bytes (180 KB) in 1001 ms at 1478 kbps
+[PAwR] theoretical ~1487 kbps; efficiency ~99% (N=64, payload=247, AdvInt=85.00 ms)
+
+128 devices: 
+[PAwR] received 189832 bytes (185 KB) in 1001 ms at 1517 kbps
+[PAwR] theoretical ~1532 kbps; efficiency ~99% (N=128, payload=247, AdvInt=165.00 ms)
+
+2 devices: 
+[PAwR] received 65392 bytes (63 KB) in 1004 ms at 521 kbps
+[PAwR] theoretical ~526 kbps; efficiency ~99% (N=2, payload=247, AdvInt=7.50 ms)
+
+5 devices: 
+[PAwR] received 108824 bytes (106 KB) in 1001 ms at 869 kbps
+[PAwR] theoretical ~878 kbps; efficiency ~98% (N=5, payload=247, AdvInt=11.25 ms)
+
+real dks: 
+
+3 devices: 
+
+[PAwR] received 84180 bytes (82 KB) in 1005 ms at 670 kbps
+[PAwR] theoretical ~677 kbps; efficiency ~98% (N=3, payload=247, AdvInt=8.75 ms)
+
+
+4 devices: 
+[PAwR] received 73444 bytes (71 KB) in 1002 ms at 586 kbps
+[PAwR] theoretical ~790 kbps; efficiency ~74% (N=4, payload=247, AdvInt=10.00 ms)
