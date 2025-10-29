@@ -25,6 +25,7 @@
 #define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
 #define NUM_SUBEVENTS 1
 #define PACKET_SIZE   251
+#define ADV_NAME "PAwR adv sample"
 
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define THROUGHPUT_PRINT_INTERVAL 1000 
@@ -409,6 +410,11 @@ void init_bufs(void)
 	}
 }
 
+static const struct bt_data ad[] = {
+    BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+    BT_DATA(BT_DATA_NAME_COMPLETE, ADV_NAME, sizeof(ADV_NAME) - 1),
+};
+
 int main(void)
 {
 	int err;
@@ -437,11 +443,25 @@ int main(void)
 		printk("Failed to create advertising set (err %d)\n", err);
 		return 0;
 	}
-	 
+
+
+	err = bt_le_ext_adv_set_data(pawr_adv, ad, ARRAY_SIZE(ad), NULL, 0);
+    if (err) {
+        printk("Failed to set ext adv data (err %d)\n", err);
+        return 0;
+    }
 	/* Set periodic advertising parameters */
 	err = bt_le_per_adv_set_param(pawr_adv, &per_adv_params);
 	if (err) {
 		printk("Failed to set periodic advertising parameters (err %d)\n", err);
+		return 0;
+	}
+
+
+    printk("Start Extended Advertising\n");
+	err = bt_le_ext_adv_start(pawr_adv, BT_LE_EXT_ADV_START_DEFAULT);
+	if (err) {
+		printk("Failed to start extended advertising (err %d)\n", err);
 		return 0;
 	}
 
@@ -453,12 +473,6 @@ int main(void)
 		return 0;
 	}
 
-	printk("Start Extended Advertising\n");
-	err = bt_le_ext_adv_start(pawr_adv, BT_LE_EXT_ADV_START_DEFAULT);
-	if (err) {
-		printk("Failed to start extended advertising (err %d)\n", err);
-		return 0;
-	}
 
     while (true) {
         k_sleep(K_SECONDS(1));

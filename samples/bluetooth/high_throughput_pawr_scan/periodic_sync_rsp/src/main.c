@@ -11,6 +11,7 @@
 #include <zephyr/random/random.h>
 
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
+#define TARGET_NAME "PAwR adv sample"
 
 static uint16_t actual_device_count = 0;
 static uint16_t dynamic_rsp_size = 0;
@@ -21,11 +22,54 @@ static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 static struct bt_le_per_adv_sync *default_sync;
 
 /* Join/assignment state */
-static uint8_t desired_subevent = 0; /* single subevent flow */
+static uint8_t target_subevent = 0; /* single subevent flow */
 static int8_t assigned_slot = -1;    /* -1 means unassigned */
 static uint32_t my_token = 0;        /* 0 means no token yet */
 static uint8_t join_backoff_mod = 3; /* attempt every N events initially */
 static uint8_t join_backoff_increase = 0; /* linear backoff growth */
+
+static struct k_work_delayable retry_subevent_sync_work; 
+
+static bool name_match_cb(struct bt_data *data, void *user_data)
+{
+	bool *matched = user_data;
+
+	if (data->type == BT_DATA_NAME_COMPLETE || data->type == BT_DATA_NAME_SHORTENED) {
+		const char *target = TARGET_NAME;
+		size_t target_len = strlen(target);
+
+		/* data->data is not null-terminated; compare lengths and bytes */
+		if (data->data_len == target_len &&
+		    memcmp(data->data, target, target_len) == 0) {
+			*matched = true;
+			return false; /* stop parsing */
+		}
+	}
+	return true; /* continue parsing */
+}
+
+static bool ad_has_target_name(struct net_buf_simple *ad)
+{
+	bool matched = false;
+	bt_data_parse(ad, name_match_cb, &matched);
+	return matched;
+}
+static void set_subevent_retry(struct k_work_delayable *work){
+    if (!default_sync){return;}
+    struct bt_le_per_adv_sync_subevent_params sync_param = {
+        .properties = 0,
+        .num_subevents = 1
+    };
+
+    uint8_t desired_subevent_id = target_subevent;
+    sync_param.subevents = &desired_subevent_id;
+    
+    static uint8_t tries;
+    int err = bt_le_per_adv_sync_subevent(default_sync, &sync_param);
+    if (err && tries++ < 5){
+        k_work_reschedule(&retry_subevent_sync_work, K_MSEC(10));
+    }
+}
 
 static void sync_cb(struct bt_le_per_adv_sync *sync, 
                    struct bt_le_per_adv_sync_synced_info *info)
@@ -43,15 +87,16 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     params.properties = 0;
     params.num_subevents = 1;
     params.subevents = subevents;
-    subevents[0] = desired_subevent;
+    subevents[0] = target_subevent;
 
     err = bt_le_per_adv_sync_subevent(sync, &params);
-    if (err) {
+    if (err || info->num_subevents == 0){
         printk("[SYNC]Failed to set subevents (err %d)\n", err);
+        //k_work_schedule(&retry_subevent_sync_work, K_MSEC(10));
+        set_subevent_retry(&retry_subevent_sync_work);
     } else {
         printk("[SYNC] Changed sync to subevent %d\n", subevents[0]);
     }
-
     k_sem_give(&sem_per_sync);
 }
 
@@ -244,6 +289,7 @@ static struct bt_le_per_adv_sync_cb sync_callbacks = {
 };
 
 
+
 /* Scan callback to detect periodic advertiser and create sync */
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
@@ -255,6 +301,9 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
         return;
     }
     if (info->sid == 0xFF) {
+        return;
+    }
+    if (!ad_has_target_name(ad)) {
         return;
     }
 
@@ -290,6 +339,7 @@ int main(void)
     bt_le_per_adv_sync_cb_register(&sync_callbacks);
 
     bt_le_scan_cb_register(&scan_cb);
+
     err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
     if (err) {
         printk("[SCAN] Error: start failed (err %d)\n", err);
