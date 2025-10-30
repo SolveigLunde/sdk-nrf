@@ -6,6 +6,7 @@
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/random/random.h>
@@ -28,7 +29,8 @@ static uint32_t my_token = 0;        /* 0 means no token yet */
 static uint8_t join_backoff_mod = 3; /* attempt every N events initially */
 static uint8_t join_backoff_increase = 0; /* linear backoff growth */
 
-static struct k_work_delayable retry_subevent_sync_work; 
+static struct k_work_delayable retry_subevent_sync_work;
+static uint8_t subevent_retry_tries;
 
 static bool name_match_cb(struct bt_data *data, void *user_data)
 {
@@ -54,21 +56,39 @@ static bool ad_has_target_name(struct net_buf_simple *ad)
 	bt_data_parse(ad, name_match_cb, &matched);
 	return matched;
 }
-static void set_subevent_retry(struct k_work_delayable *work){
-    if (!default_sync){return;}
+static void attempt_subevent_sync(void)
+{
+    if (!default_sync) {
+        subevent_retry_tries = 0;
+        return;
+    }
+
     struct bt_le_per_adv_sync_subevent_params sync_param = {
         .properties = 0,
-        .num_subevents = 1
+        .num_subevents = 1,
     };
 
     uint8_t desired_subevent_id = target_subevent;
     sync_param.subevents = &desired_subevent_id;
-    
-    static uint8_t tries;
+
     int err = bt_le_per_adv_sync_subevent(default_sync, &sync_param);
-    if (err && tries++ < 5){
-        k_work_reschedule(&retry_subevent_sync_work, K_MSEC(10));
+    if (err) {
+        if (++subevent_retry_tries <= 5U) {
+            (void)k_work_reschedule(&retry_subevent_sync_work, K_MSEC(10));
+        } else {
+            printk("[SYNC] Failed to set subevents after %u tries (err %d)\n",
+                   subevent_retry_tries, err);
+        }
+    } else {
+        subevent_retry_tries = 0;
+        (void)k_work_cancel_delayable(&retry_subevent_sync_work);
     }
+}
+
+static void set_subevent_retry(struct k_work *work)
+{
+    ARG_UNUSED(work);
+    attempt_subevent_sync();
 }
 
 static void sync_cb(struct bt_le_per_adv_sync *sync, 
@@ -92,10 +112,12 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     err = bt_le_per_adv_sync_subevent(sync, &params);
     if (err || info->num_subevents == 0){
         printk("[SYNC]Failed to set subevents (err %d)\n", err);
-        //k_work_schedule(&retry_subevent_sync_work, K_MSEC(10));
-        set_subevent_retry(&retry_subevent_sync_work);
+        subevent_retry_tries = 0;
+        (void)k_work_reschedule(&retry_subevent_sync_work, K_NO_WAIT);
     } else {
         printk("[SYNC] Changed sync to subevent %d\n", subevents[0]);
+        subevent_retry_tries = 0;
+        (void)k_work_cancel_delayable(&retry_subevent_sync_work);
     }
     k_sem_give(&sem_per_sync);
 }
@@ -106,6 +128,8 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
     char le_addr[BT_ADDR_LE_STR_LEN];
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
     default_sync = NULL;
+    (void)k_work_cancel_delayable(&retry_subevent_sync_work);
+    subevent_retry_tries = 0;
     k_sem_give(&sem_per_sync_lost);
 }
 
@@ -329,6 +353,8 @@ int main(void)
     int err;
 
     printk("Starting PAwR Synchronizer\n");
+
+    k_work_init_delayable(&retry_subevent_sync_work, set_subevent_retry);
 
     err = bt_enable(NULL);
     if (err) {

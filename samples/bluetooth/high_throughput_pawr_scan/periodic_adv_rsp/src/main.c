@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
-#include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
@@ -75,9 +73,13 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
 
     const uint16_t min_interval_units = (uint16_t)((MIN_PAWR_INTERVAL_MS + 1) / 1.25f); /* small bias upward */
     const uint16_t required_interval_units = (uint16_t)((total_event_time_ms_x100 + 125U - 1U) / 125U);
-    const uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units)
+    uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units)
                                                           ? required_interval_units
                                                           : min_interval_units;
+
+    if (advertising_event_interval_units < subevent_interval_units) {
+        advertising_event_interval_units = subevent_interval_units;
+    }
 
     /* One subevent, N slots, maximum payload per slot */
     params->interval_min = advertising_event_interval_units;
