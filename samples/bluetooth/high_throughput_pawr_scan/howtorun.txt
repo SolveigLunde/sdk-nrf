@@ -37,7 +37,7 @@ Step 4. Flash roles to the DKs
 
 ```bash
     #Advertiser
-    
+    west flash -d periodic_adv_rsp/build --snr <id-number>
 
     #Sync scanners (repeat for number of devices. Remember to change id)
     west flash -d periodic_sync_rsp/build --snr <id-number>

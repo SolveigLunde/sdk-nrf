@@ -7,27 +7,26 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
-#include <zephyr/sys/util.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/random/random.h>
+#include <string.h>
 
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define TARGET_NAME "PAwR adv sample"
 
-static uint16_t actual_device_count = 0;
-static uint16_t dynamic_rsp_size = 0;
+static uint16_t payload_rsp_size = 0;
 
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
 static K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
-static struct bt_le_per_adv_sync *default_sync;
+static struct bt_le_per_adv_sync *sync_handle;
 
 /* Join/assignment state */
-static uint8_t target_subevent = 0; /* single subevent flow */
-static int8_t assigned_slot = -1;    /* -1 means unassigned */
-static uint32_t my_token = 0;        /* 0 means no token yet */
-static uint8_t join_backoff_mod = 3; /* attempt every N events initially */
-static uint8_t join_backoff_increase = 0; /* linear backoff growth */
+static uint8_t target_subevent = 0;         /* single subevent flow */
+static int8_t assigned_slot = -1;           /* -1 means unassigned */
+static uint32_t my_token = 0;               /* 0 means no token yet */
+static uint8_t join_backoff_mod = 3;        /* attempt every N events initially */
+static uint8_t join_backoff_increase = 0;   /* linear backoff growth */
 
 static struct k_work_delayable retry_subevent_sync_work;
 static uint8_t subevent_retry_tries;
@@ -58,7 +57,7 @@ static bool ad_has_target_name(struct net_buf_simple *ad)
 }
 static void attempt_subevent_sync(void)
 {
-    if (!default_sync) {
+    if (!sync_handle) {
         subevent_retry_tries = 0;
         return;
     }
@@ -71,7 +70,7 @@ static void attempt_subevent_sync(void)
     uint8_t desired_subevent_id = target_subevent;
     sync_param.subevents = &desired_subevent_id;
 
-    int err = bt_le_per_adv_sync_subevent(default_sync, &sync_param);
+    int err = bt_le_per_adv_sync_subevent(sync_handle, &sync_param);
     if (err) {
         if (++subevent_retry_tries <= 5U) {
             (void)k_work_reschedule(&retry_subevent_sync_work, K_MSEC(10));
@@ -100,9 +99,9 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     int err;
 
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-    printk("[SYNC]Synced to %s with %d subevents\n", le_addr, info->num_subevents);
+    printk("[SYNC] Synced to %s with %d subevents\n", le_addr, info->num_subevents);
 
-    default_sync = sync;
+    sync_handle = sync;
 
     params.properties = 0;
     params.num_subevents = 1;
@@ -111,7 +110,7 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
 
     err = bt_le_per_adv_sync_subevent(sync, &params);
     if (err || info->num_subevents == 0){
-        printk("[SYNC]Failed to set subevents (err %d)\n", err);
+        printk("[SYNC] Failed to set subevents (err %d)\n", err);
         subevent_retry_tries = 0;
         (void)k_work_reschedule(&retry_subevent_sync_work, K_NO_WAIT);
     } else {
@@ -127,7 +126,7 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
 {
     char le_addr[BT_ADDR_LE_STR_LEN];
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-    default_sync = NULL;
+    sync_handle = NULL;
     (void)k_work_cancel_delayable(&retry_subevent_sync_work);
     subevent_retry_tries = 0;
     k_sem_give(&sem_per_sync_lost);
@@ -142,22 +141,16 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
                    struct net_buf_simple *buf)
 {
 
-    // Initialize dynamic response size if not set
-    if (dynamic_rsp_size == 0) {
-        dynamic_rsp_size = MAX_INDIVIDUAL_RESPONSE_SIZE - 3;
-        if (actual_device_count > 0) {
-            printk("Responder using dynamic response size: %d bytes\n", dynamic_rsp_size);
-            printk("Configured for %d devices = %d bytes total\n", 
-                   actual_device_count, actual_device_count * dynamic_rsp_size);
-        } else {
-            printk("Responder using fallback response size: %d bytes\n", dynamic_rsp_size);
-            printk("Will be reconfigured when advertiser provides device count\n");
-        }
+    // Initialize payload response size if not set
+    if (payload_rsp_size == 0) {
+        payload_rsp_size = MAX_INDIVIDUAL_RESPONSE_SIZE - 3;
+        printk("[SYNC] Response size: %d bytes\n", payload_rsp_size);
+ 
     }
 
     if (buf && buf->len) {
         uint8_t open_len = 0;
-        uint8_t open_bitmap[32]; /* supports up to 256 slots; grows if needed */
+        uint8_t open_bitmap[32]; // supports up to 256 slots
         memset(open_bitmap, 0, sizeof(open_bitmap));
         uint8_t ack_count = 0;
         const uint8_t *acks_ptr = NULL;
@@ -169,11 +162,11 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
             if (data[1] == BT_DATA_MANUFACTURER_DATA && data[2] == 0x59 && data[3] == 0x00) {
                 uint8_t idx = 4;
                 if (buf->len > idx + 1) {
-                    /* version */
+                    /* protocol version */
                     idx += 1;
                 }
                 if (buf->len > idx + 1) {
-                    /* flags */
+                    /* protocol flags */
                     idx += 1;
                 }
                 if (buf->len > idx) {
@@ -280,14 +273,16 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
 
         /* Generate test data only when assigned */
         if (assigned_slot >= 0) {
+
             /* Check retransmit bit for our slot */
             bool should_retransmit = false;
             if (assigned_slot < 32 && (retransmit_bitmap32 & (1U << assigned_slot))) {
                 should_retransmit = true;
+                printk("[SYNC] should retransmit for slot %d\n", assigned_slot);
             }
 
             net_buf_simple_reset(&rsp_buf);
-            for (int i = 0; i < dynamic_rsp_size; i++) {
+            for (int i = 0; i < payload_rsp_size; i++) {
                 net_buf_simple_add_u8(&rsp_buf, (uint8_t)(assigned_slot + i));
             }
 
@@ -298,11 +293,11 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
 
             int err3 = bt_le_per_adv_set_response_data(sync, &rsp_params, &rsp_buf);
             if (err3) {
-                printk("Failed to send response (err %d)\n", err3);
+                printk(" [SYNC] Failed to send response (err %d)\n", err3);
             }
         }
     } else {
-        printk("Failed to receive on subevent %d\n", info->subevent);
+        /* No data to process for this subevent*/
     }
 }
 
@@ -317,7 +312,7 @@ static struct bt_le_per_adv_sync_cb sync_callbacks = {
 /* Scan callback to detect periodic advertiser and create sync */
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
-    if (default_sync) {
+    if (sync_handle) {
         return;
     }
 
@@ -337,7 +332,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
     param.skip = 0; 
     param.timeout = 1000; /* 10s */
 
-    int err = bt_le_per_adv_sync_create(&param, &default_sync);
+    int err = bt_le_per_adv_sync_create(&param, &sync_handle);
     if (!err) {
         printk("[SCAN] Creating periodic sync to SID %u\n", info->sid);
         (void)bt_le_scan_stop();
@@ -387,7 +382,7 @@ int main(void)
         my_token = 0;
         join_backoff_mod = 3;
         join_backoff_increase = 0;
-        default_sync = NULL;
+        sync_handle = NULL;
         (void)bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
     }
 

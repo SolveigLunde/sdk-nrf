@@ -9,7 +9,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <string.h>
-#include <stdio.h>
 #include <math.h>
 #include <stdint.h>
 
@@ -22,33 +21,28 @@
 
 #define NUM_RSP_SLOTS CONFIG_BT_MAX_THROUGHPUT_DEVICES
 #define NUM_SUBEVENTS 1
-#define PACKET_SIZE   251
+#define PAYLOAD_SIZE   251
 #define ADV_NAME "PAwR adv sample"
 
 #define MAX_INDIVIDUAL_RESPONSE_SIZE 247 // BLE spec limit for individual responses
 #define THROUGHPUT_PRINT_INTERVAL 1000 
 
 static uint32_t total_bytes;
-static uint64_t stamp;
-
-/* Cached PAwR config for reporting, used in throughput printouts */
-static uint16_t g_num_rsp_slots_print;
-static uint16_t g_payload_size_print;
-static uint32_t g_adv_event_ms_x100_print;
+static int64_t stamp;
  
 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
     /* BLE spec / Zephyr API constraints (see bt_le_per_adv_param docs) */
-    const uint16_t MIN_PAWR_INTERVAL_MS = 1;             /* increase lower bound for stability if needed */
-    const float ADVERTISER_GUARD_MS = 1.0f;              /* end-of-event guard, increase if needed*/
+    const uint16_t MIN_PAWR_INTERVAL_MS = 1;             
+    const float ADVERTISER_GUARD_MS = 1.0f;     
     const uint8_t PHY_RATE_MBPS = 2;         
 
     /* Max per-slot payload for PAwR responses */
-    const uint16_t packet_size = MAX_INDIVIDUAL_RESPONSE_SIZE; 
+    const uint16_t payload_size = MAX_INDIVIDUAL_RESPONSE_SIZE; 
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
-    const float tx_time_ms = (float)(packet_size * 8) / (PHY_RATE_MBPS * 1000.0f);
+    const float tx_time_ms = (float)(payload_size * 8) / (PHY_RATE_MBPS * 1000.0f);
     const float slot_time_ms = tx_time_ms + 0.25f; 
 
     /* Convert per-slot time to spacing in 0.125 ms units, clamp per API (0.25..31.875 ms) */
@@ -71,7 +65,7 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
                                               (uint32_t)num_response_slots * ((uint32_t)slot_spacing_units * 125U / 10U) +
                                               (uint32_t)((ADVERTISER_GUARD_MS) * 100.0f);
 
-    const uint16_t min_interval_units = (uint16_t)((MIN_PAWR_INTERVAL_MS + 1) / 1.25f); /* small bias upward */
+    const uint16_t min_interval_units = (uint16_t)((MIN_PAWR_INTERVAL_MS + 1) / 1.25f); /* min interval (1.25 ms units) */
     const uint16_t required_interval_units = (uint16_t)((total_event_time_ms_x100 + 125U - 1U) / 125U);
     uint16_t advertising_event_interval_units = (required_interval_units > min_interval_units)
                                                           ? required_interval_units
@@ -97,20 +91,14 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     const uint32_t slot_ms_x100 = (uint32_t)slot_spacing_units * 125U / 10U;
     const uint32_t est_throughput_kbps =
         (adv_event_ms_x100 > 0U)
-            ? (uint32_t)(((uint64_t)num_response_slots * packet_size * 8ULL * 100000ULL) /
+            ? (uint32_t)(((uint64_t)num_response_slots * payload_size * 8ULL * 100000ULL) /
                          (uint64_t)adv_event_ms_x100) /
                   1000U
             : 0U;
 
-	/* Cache for later window reports */
-	g_num_rsp_slots_print = num_response_slots;
-	g_payload_size_print = packet_size;
-	g_adv_event_ms_x100_print = adv_event_ms_x100;
-	
-
     printk("PAwR config (1 subevent):\n");
     printk("  Devices: %u, Resp size: %u B, Slot: %u.%02u ms\n",
-           num_response_slots, packet_size, slot_ms_x100 / 100U, slot_ms_x100 % 100U);
+           num_response_slots, payload_size, slot_ms_x100 / 100U, slot_ms_x100 % 100U);
     printk("  Delay: %u (%u.%02u ms), SubEvt: %u (%u.%02u ms), AdvInt: %u (%u.%02u ms)\n",
            delay_units, (uint32_t)delay_units * 125U / 100U, (uint32_t)delay_units * 125U % 100U,
            subevent_interval_units, subevent_ms_x100 / 100U, subevent_ms_x100 % 100U,
@@ -127,7 +115,7 @@ void init_adv_params(void) {
 
 static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
 static struct net_buf_simple bufs[NUM_SUBEVENTS];
-static uint8_t backing_store[NUM_SUBEVENTS][PACKET_SIZE];
+static uint8_t backing_store[NUM_SUBEVENTS][PAYLOAD_SIZE];
 
 BUILD_ASSERT(ARRAY_SIZE(bufs) == ARRAY_SIZE(subevent_data_params));
 BUILD_ASSERT(ARRAY_SIZE(backing_store) == ARRAY_SIZE(subevent_data_params));
@@ -155,7 +143,7 @@ struct ack_entry {
 static struct ack_entry ack_queue[MAX_ACKS_PER_EVENT];
 static uint8_t ack_queue_count;
 
-
+/* Build a bitmap of unassigned (open) slots; Bit i set => slot i is open*/
 static void build_open_slots_bitmap(uint8_t *out, uint8_t bytes)
 {
     memset(out, 0, bytes);
@@ -170,6 +158,7 @@ static void build_open_slots_bitmap(uint8_t *out, uint8_t bytes)
     }
 }
 
+/* Linear search for slot by token owner*/
 static int find_slot_by_token(uint32_t token)
 {
     if (token == 0) {
@@ -183,6 +172,7 @@ static int find_slot_by_token(uint32_t token)
     return -1;
 }
 
+/* Append an ACK (tocken,slot) if queue has room */
 static void queue_ack(uint32_t token, uint8_t slot)
 {
     if (ack_queue_count < MAX_ACKS_PER_EVENT) {
@@ -192,14 +182,18 @@ static void queue_ack(uint32_t token, uint8_t slot)
     }
 }
 
+/* Set bit in a byte-addressed bitmap*/
 static void bitmap_set_bit(uint8_t *bitmap, int bit) {
+    /* Test bit in a byte-addressed bitmap*/
     bitmap[bit / 8] |= (1 << (bit % 8));
 }
 
+/* Clear bitmap to zero for the first num_bits bits */
 static bool bitmap_test_bit(const uint8_t *bitmap, int bit) {
     return (bitmap[bit / 8] & (1 << (bit % 8))) != 0;
 }
 
+/* Build PAwR control payload and program controller*/
 static void bitmap_clear(uint8_t *bitmap, int num_bits) {
     memset(bitmap, 0, BITMAP_BYTES_NEEDED(num_bits));
 }
@@ -221,7 +215,6 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
     uint8_t bitmap_bytes = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
     uint8_t retransmit_bitmap[bitmap_bytes];
     
-    // retransmit_bitmap = expected_responses & (~response_bitmap)
     for (int i = 0; i < bitmap_bytes; i++) {
         retransmit_bitmap[i] = expected_responses[i] & (~response_bitmap[i]);
     }
@@ -240,7 +233,7 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
                 slot_state[slot].assigned = false;
                 slot_state[slot].token = 0;
                 noresp_counters[slot] = 0;
-                printk("Reclaimed idle slot %d\n", slot);
+                printk("[CLAIM] Reclaimed idle slot %d\n", slot);
             }
         } else if (got_response) {
             noresp_counters[slot] = 0;
@@ -258,10 +251,8 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
         uint8_t *length_field = net_buf_simple_add(buf, 1);
         net_buf_simple_add_u8(buf, BT_DATA_MANUFACTURER_DATA);
         net_buf_simple_add_le16(buf, 0x0059); // Nordic Company ID
-
-        /* Version and flags */
-        net_buf_simple_add_u8(buf, 0x01); // version
-        net_buf_simple_add_u8(buf, 0x00); // flags
+        net_buf_simple_add_u8(buf, 0x01); // protocol version
+        net_buf_simple_add_u8(buf, 0x00); // protocol flags (none)
 
         /* Open slots bitmap */
         uint8_t open_len_full = BITMAP_BYTES_NEEDED(NUM_RSP_SLOTS);
@@ -310,7 +301,7 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
 
     err = bt_le_per_adv_set_subevent_data(adv, to_send, subevent_data_params);
     if (err) {
-        printk("Failed to set subevent data (err %d)\n", err);
+        printk(" [ADV]Failed to set subevent data (err %d)\n", err);
     } 
 }
 
@@ -324,7 +315,7 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
     if (buf) {
         /* Initialize timestamp on first response */
         if (total_bytes == 0) {
-            stamp = k_uptime_get_32();
+            stamp = k_uptime_get();
         }
 
         /* Handle claim messages or data responses */
@@ -345,7 +336,7 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
                     slot_state[info->response_slot].token = token;
                     bitmap_set_bit(expected_responses, info->response_slot);
                     queue_ack(token, info->response_slot);
-                    printk("CLAIM accepted: slot %d token 0x%08x\n", info->response_slot, token);
+                    printk("[CLAIM] accepted: slot %d token 0x%08x\n", info->response_slot, token);
                 } else {
                     /* Slot already assigned to a different token: ignore */
                 }
@@ -355,8 +346,6 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
             total_bytes += buf->len;
         }
 
-	
-        
         if (info->response_slot < NUM_RSP_SLOTS) {
             bitmap_set_bit(response_bitmap, info->response_slot);
         }
@@ -366,23 +355,27 @@ static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response
             delta = k_uptime_delta(&stamp);
 			/* Measured kbps over the window */
 			uint64_t measured_kbps = (delta > 0) ? (((uint64_t)total_bytes * 8ULL) / (uint64_t)delta) : 0ULL;
-			printk("\n[PAwR] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
+			printk("\n[ADV] received %u bytes (%u KB) in %lld ms at %llu kbps\n",
 			   total_bytes, total_bytes / 1024, delta, measured_kbps);
-
-			/* Context lines: theoretical and efficiency (avoid divide by zero) */
-			if (g_adv_event_ms_x100_print > 0 && g_num_rsp_slots_print > 0) {
-
-				/* Recompute theoretical in case config changed mid-run */
-				uint32_t theo_kbps = (uint32_t)(((uint64_t)g_num_rsp_slots_print * g_payload_size_print * 8ULL * 100000ULL) /
-									(uint64_t)g_adv_event_ms_x100_print) / 1000U;
-				printk("[PAwR] theoretical ~%u kbps; efficiency ~%u%% (N=%u, payload=%u, AdvInt=%u.%02u ms)\n",
-				       (unsigned int)theo_kbps,
-				       (unsigned int)((theo_kbps > 0) ? (uint32_t)((measured_kbps * 100ULL) / theo_kbps) : 0U),
-				       (unsigned int)g_num_rsp_slots_print,
-				       (unsigned int)g_payload_size_print,
-				       (unsigned int)(g_adv_event_ms_x100_print / 100U),
-				       (unsigned int)(g_adv_event_ms_x100_print % 100U));
-			}
+            
+            uint16_t interval_units = per_adv_params.interval_min; 
+            uint32_t adv_ms_x100 = (uint32_t)interval_units * 125U;
+            uint16_t num_rsp_slots = per_adv_params.num_response_slots;
+            uint16_t payload_bytes = MAX_INDIVIDUAL_RESPONSE_SIZE;
+            
+            if (adv_ms_x100 > 0U && num_rsp_slots > 0U) {
+                uint32_t theo_kbps =
+                    (uint32_t)(((uint64_t)num_rsp_slots * payload_bytes * 8ULL * 100000ULL) /
+                                (uint64_t)adv_ms_x100) / 1000U;
+            
+                printk("[PAwR] theoretical ~%u kbps; efficiency ~%u%% (N=%u, payload=%u, AdvInt=%u.%02u ms)\n",
+                        (unsigned int)theo_kbps,
+                        (unsigned int)((theo_kbps > 0U) ? (uint32_t)((measured_kbps * 100ULL) / theo_kbps) : 0U),
+                        (unsigned int)num_rsp_slots,
+                        (unsigned int)payload_bytes,
+                        (unsigned int)(adv_ms_x100 / 100U),
+                        (unsigned int)(adv_ms_x100 % 100U));
+            }
             total_bytes = 0;
         }
     }
@@ -397,7 +390,7 @@ static const struct bt_le_ext_adv_cb adv_cb = {
 void init_bufs(void)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(backing_store); i++) {
-		/* Initialize the buffer first */
+		/* Initialize buffer with backing storage */
 		net_buf_simple_init_with_data(&bufs[i], &backing_store[i],
 								ARRAY_SIZE(backing_store[i]));
 		
@@ -408,7 +401,7 @@ void init_bufs(void)
 		net_buf_simple_add_u8(&bufs[i], BT_DATA_MANUFACTURER_DATA);
 		net_buf_simple_add_le16(&bufs[i], 0x0059); /* Nordic Company ID */
 		
-		printk("Buffer %d initialized with len %d\n", i, bufs[i].len);
+		printk("[ADV] Buffer %zu initialized with len %u\n", i, bufs[i].len);
 	}
 }
 
@@ -422,22 +415,22 @@ int main(void)
 	int err;
 	struct bt_le_ext_adv *pawr_adv;
 
+    // Initialize buffers
 	init_bufs();
 
-	printk("Starting PAwR Advertiser\n");
-	printk("===========================================\n");
-
-
+    // Initialize Bluetooth
 	err = bt_enable(NULL);
 	if (err) {
 		printk("Bluetooth init failed (err %d)\n", err);
 		return 0;
 	}
-
 	printk("Bluetooth initialized\n");
 
-	// Initialize buffers and parameters
+	// Initialize parameters
 	init_adv_params();
+
+    printk("Starting PAwR Advertiser\n");
+	printk("===========================================\n");
 
 	/* Create a non-connectable advertising set */
 	err = bt_le_ext_adv_create(BT_LE_EXT_ADV_NCONN, &adv_cb, &pawr_adv);
@@ -446,12 +439,13 @@ int main(void)
 		return 0;
 	}
 
-
+    /* Set extended advertising data */
 	err = bt_le_ext_adv_set_data(pawr_adv, ad, ARRAY_SIZE(ad), NULL, 0);
     if (err) {
         printk("Failed to set ext adv data (err %d)\n", err);
         return 0;
     }
+
 	/* Set periodic advertising parameters */
 	err = bt_le_per_adv_set_param(pawr_adv, &per_adv_params);
 	if (err) {
@@ -459,7 +453,7 @@ int main(void)
 		return 0;
 	}
 
-
+    /* Enable Extended Advertising */
     printk("Start Extended Advertising\n");
 	err = bt_le_ext_adv_start(pawr_adv, BT_LE_EXT_ADV_START_DEFAULT);
 	if (err) {
@@ -474,11 +468,6 @@ int main(void)
 		printk("Failed to enable periodic advertising (err %d)\n", err);
 		return 0;
 	}
-
-
-    while (true) {
-        k_sleep(K_SECONDS(1));
-    }
 
 	return 0;
 }
