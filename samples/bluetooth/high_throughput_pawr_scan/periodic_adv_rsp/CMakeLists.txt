@@ -7,4 +7,8 @@ project(periodic_adv_rsp)
 
 target_sources(app PRIVATE
   src/main.c
+  src/pawr_broadcaster.c
+  src/onboarding_manager.c
   )
+
+target_include_directories(app PRIVATE include)
