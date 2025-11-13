@@ -20,6 +20,7 @@
 * Retransmissions are bitmap-controlled.
 */
 
+
 #define NUM_RSP_SLOTS                   CONFIG_BT_MAX_THROUGHPUT_DEVICES
 #define NUM_SUBEVENTS                   1
 #define PAYLOAD_SIZE                    251
@@ -30,34 +31,35 @@
 #define THROUGHPUT_PRINT_INTERVAL       1000 
 #define PAWR_CLAIM_MSG_ID               0xC1
 #define CLAIM_MSG_LEN                   5 /* Claim token length (4B) + Claim token offset (1B) */
+#define PAWR_INTERVAL_UNIT_MS_X100      125U
+#define PAWR_PHY_MBIT_PER_S             2U  /* LE 2M */
  
 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
 {
-    const uint16_t min_pawr_interval_ms         = 1; 
-    const uint8_t phy_rate_mbps                 = 2;         
+    const uint16_t min_pawr_interval_ms         = 1;       
     const uint16_t payload_size                 = MAX_INDIVIDUAL_RESPONSE_SIZE; 
     const uint32_t advertiser_guard_ms_x100     = 100U; /* 1.00 ms -> 100 */
     const uint32_t quarter_ms_x100              = 25U;  /* 0.25 ms -> 25 */
     const uint8_t response_slot_delay_units     = 3U;   /* 3 * 1.25 ms = 3.75 ms */
-    const uint32_t response_slot_delay_ms_x100  = (uint32_t)response_slot_delay_units * 125U;
+    const uint32_t response_slot_delay_ms_x100  = (uint32_t)response_slot_delay_units * PAWR_INTERVAL_UNIT_MS_X100;
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
     const uint32_t payload_bits     = (uint32_t)payload_size * 8U; /* payload_size * 8 bits = total bits to transmit */
-    const uint32_t tx_denom         = (uint32_t)phy_rate_mbps * 10U; /* phy_rate_mbps * 10 = bits per ms */
-    const uint32_t tx_time_ms_x100  = (payload_bits + tx_denom - 1U) / tx_denom; 
+    const uint32_t tx_denom_ms         = (uint32_t)PAWR_PHY_MBIT_PER_S * 10U; /* PAWR_PHY_MBIT_PER_S * 10 = bits per ms */
+    const uint32_t tx_time_ms_x100  = (payload_bits + tx_denom_ms - 1U) / tx_denom_ms; 
 
     const uint32_t slot_ms_x100     = tx_time_ms_x100 + quarter_ms_x100;
 
-    const uint32_t slot_units           = (uint32_t)((slot_ms_x100 * 2U + 25U - 1U) / 25U);
-    if (slot_units > 0xFFFFU) { /* safety, unlikely */
+    const uint32_t slot_units           = DIV_ROUND_UP(slot_ms_x100 * 10U, PAWR_INTERVAL_UNIT_MS_X100);
+    if (slot_units > UINT16_MAX) { /* safety, unlikely */
         printk("slot_units overflow\n");
     }
     const uint16_t slot_spacing_units = (uint16_t)slot_units;
 
     const uint32_t subevent_ms_x100 = response_slot_delay_ms_x100 + (uint32_t)num_response_slots * slot_ms_x100;
 
-    uint32_t subevent_interval_units_tmp = (subevent_ms_x100 + 125U - 1U) / 125U;
+    uint32_t subevent_interval_units_tmp = DIV_ROUND_UP(subevent_ms_x100, PAWR_INTERVAL_UNIT_MS_X100);
     uint16_t subevent_interval_units = (uint16_t)(subevent_interval_units_tmp);
     if (subevent_interval_units < 6U) {
         subevent_interval_units = 6U;
@@ -67,9 +69,9 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     }
 
     const uint32_t total_event_ms_x100 = subevent_ms_x100 + advertiser_guard_ms_x100;
-    const uint32_t min_interval_units = (uint32_t)(((uint32_t)min_pawr_interval_ms * 100U + 125U - 1U) / 125U);
+    const uint32_t min_interval_units = (uint32_t)(((uint32_t)min_pawr_interval_ms * 100U + PAWR_INTERVAL_UNIT_MS_X100 - 1U) / PAWR_INTERVAL_UNIT_MS_X100);
 
-    const uint32_t required_interval_units = (total_event_ms_x100 + 125U - 1U) / 125U;
+    const uint32_t required_interval_units = (total_event_ms_x100 + PAWR_INTERVAL_UNIT_MS_X100 - 1U) / PAWR_INTERVAL_UNIT_MS_X100;
 
     uint16_t advertising_event_interval_units =
         (required_interval_units > min_interval_units) ? (uint16_t)required_interval_units : (uint16_t)min_interval_units;
