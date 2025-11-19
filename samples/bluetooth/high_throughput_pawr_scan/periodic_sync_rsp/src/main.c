@@ -13,11 +13,11 @@
 
 #define TARGET_NAME                     "PAwR adv sample"
 #define NORDIC_COMPANY_ID               0x0059
-#define MSD_HEADER_LEN                   4 /* Manufacturer specific data header length */
-#define ACK_ENTRY_SIZE                   5 /* token (4B) + slot (1B) */
-#define ACK_SLOT_OFFSET                  4 /* offset of slot in ACK entry */
-#define MIN_PAYLOAD_SIZE (MSD_HEADER_LEN + 5) /* MSD header (4B) + protocol version (1B) + protocl flags (1B), open_len (1B), ack_count(1B), rt_len(1B) */
-#define MAX_INDIVIDUAL_RESPONSE_SIZE    247 /* BLE spec limit for individual responses */
+#define MSD_HEADER_LEN                  4                       /* Manufacturer specific data header length */
+#define ACK_ENTRY_SIZE                  5                       /* token (4B) + slot (1B) */
+#define ACK_SLOT_OFFSET                 4                       /* offset of slot in ACK entry */
+#define MIN_PAYLOAD_SIZE                (MSD_HEADER_LEN + 5)    /* MSD header (4B) + protocol version (1B) + protocl flags (1B), open_len (1B), ack_count(1B), rt_len(1B) */
+#define MAX_INDIVIDUAL_RESPONSE_SIZE    247                     /* BLE spec limit for individual responses */
 
 /* Variables for token based claim/ack protocol*/
 #define CLAIM_MSG_ID                    0xC1
@@ -43,11 +43,9 @@ static  uint8_t  subevent_retry_tries;
 static bool name_match_cb(struct bt_data *data, void *user_data)
 {
 	bool *matched = user_data;
-
 	if (data->type == BT_DATA_NAME_COMPLETE || data->type == BT_DATA_NAME_SHORTENED) {
 		const char *target  = TARGET_NAME;
 		size_t target_len   = strlen(target);
-
 		/* data->data is not null-terminated; compare lengths and bytes */
 		if (data->data_len == target_len &&
 		    memcmp(data->data, target, target_len) == 0) {
@@ -64,6 +62,7 @@ static bool ad_has_target_name(struct net_buf_simple *ad)
 	bt_data_parse(ad, name_match_cb, &matched);
 	return matched;
 }
+
 static void attempt_subevent_sync(void)
 {
     if (!sync_handle) {
@@ -77,11 +76,11 @@ static void attempt_subevent_sync(void)
     };
 
     uint8_t desired_subevent_id = target_subevent;
-    sync_param.subevents        = &desired_subevent_id;
+    sync_param.subevents = &desired_subevent_id;
 
     int err = bt_le_per_adv_sync_subevent(sync_handle, &sync_param);
     if (err) {
-        if (++subevent_retry_tries <= 5U) {
+        if (++subevent_retry_tries <= 5U) { /* retry up to 5 times*/
             (void)k_work_reschedule(&retry_subevent_sync_work, K_MSEC(10));
         } else {
             printk("[SYNC] Failed to set subevents after %u tries (err %d)\n",
@@ -130,8 +129,7 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     k_sem_give(&sem_per_sync);
 }
 
-static void term_cb(struct bt_le_per_adv_sync *sync,
-                   const struct bt_le_per_adv_sync_term_info *info)
+static void term_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_sync_term_info *info)
 {
     char le_addr[BT_ADDR_LE_STR_LEN];
     bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
@@ -142,17 +140,16 @@ static void term_cb(struct bt_le_per_adv_sync *sync,
 }
 
 
-void build_claim_payload(struct net_buf_simple *rsp_buf, uint32_t my_token){
+void build_claim_payload(struct net_buf_simple *rsp_buf, uint32_t my_token)
+{
     /* Build CLAIM payload: [Claim ID][Claim token (4B) + Claim token offset (1B)] */
     net_buf_simple_reset(rsp_buf);
     net_buf_simple_add_u8(rsp_buf, CLAIM_MSG_ID);
     net_buf_simple_add_le32(rsp_buf, my_token);
-
 }
 
 
-static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_sync_recv_info *info,
-                   struct net_buf_simple *buf)
+static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_sync_recv_info *info, struct net_buf_simple *buf)
 {
     static uint16_t payload_rsp_size;
     static struct bt_le_per_adv_response_params rsp_params;
@@ -163,17 +160,16 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
     if (payload_rsp_size == 0) {
         payload_rsp_size = MAX_INDIVIDUAL_RESPONSE_SIZE - data_buf_size;
         printk("[SYNC] Response size: %d bytes\n", payload_rsp_size);
- 
     }
 
     if (buf && buf->len) {
-        uint8_t open_len = 0;
-        uint8_t open_bitmap[32]; /* supports up to 256 slots */
+        uint8_t         open_len            = 0;
+        uint8_t         open_bitmap[32]; /* supports up to 256 slots */
         memset(open_bitmap, 0, sizeof(open_bitmap));
-        uint8_t ack_count = 0;
-        const uint8_t *acks_ptr = NULL;
-        uint8_t rt_len = 0;
-        uint32_t retransmit_bitmap32 = 0;
+        uint8_t         ack_count           = 0;
+        const uint8_t   *acks_ptr           = NULL;
+        uint8_t         rt_len              = 0; 
+        uint32_t        retransmit_bitmap32 = 0;
 
         /* Parsing incoming PAwR control AD payload in buf->data to extract open-slot bitmap, ACK list and retransmit bitmap */
         if (buf->len >= MIN_PAYLOAD_SIZE) {
@@ -209,7 +205,7 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
                     rt_len = data[idx++];
                 }
                 /* Extract up to 4 bytes of retransmit bitmap for quick checks */
-                for (int i = 0; i < rt_len && i < sizeof(retransmit_bitmap32); i++) {
+                for (int i = 0; i < rt_len && i < 4; i++) {
                     if (buf->len > idx + i) {
                         retransmit_bitmap32 |= ((uint32_t)data[idx + i]) << (8 * i);
                     }
@@ -220,8 +216,8 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
         /* If we're unassigned, look for ACK with our token */
         if (assigned_slot < 0 && my_token != 0 && acks_ptr && ack_count > 0) {
             for (uint8_t a = 0; a < ack_count; a++) {
-                uint32_t tok = sys_get_le32(&acks_ptr[a * ACK_ENTRY_SIZE]);
-                uint8_t slot = acks_ptr[a * ACK_ENTRY_SIZE + ACK_SLOT_OFFSET];
+                uint32_t tok  = sys_get_le32(&acks_ptr[a * ACK_ENTRY_SIZE]);
+                uint8_t  slot = acks_ptr[a * ACK_ENTRY_SIZE + ACK_SLOT_OFFSET];
                 if (tok == my_token) {
                     assigned_slot = slot;
                     printk("[JOIN] Acked: token 0x%08x assigned slot %d\n", my_token, assigned_slot);
@@ -239,8 +235,8 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
                 /* Choose a random open slot from variable-length bitmap */
                 if (open_len > 0) {
                     /* Compute max slots*/
-                    uint16_t max_slots = (uint16_t)(open_len * 8);
-                    uint16_t bitmap_slots_cap = (uint16_t)(sizeof(open_bitmap) * 8);
+                    uint16_t max_slots          = (uint16_t)(open_len * 8);
+                    uint16_t bitmap_slots_cap   = (uint16_t)(sizeof(open_bitmap) * 8);
                     if (max_slots > bitmap_slots_cap) {
                         max_slots = bitmap_slots_cap;
                     }
@@ -256,8 +252,8 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
                     }
                     if (open_count > 0) {
                         /* Pick a random open index*/
-                        uint32_t r = sys_rand32_get();
-                        uint16_t pick = (uint16_t)(r % open_count);
+                        uint32_t r      = sys_rand32_get();
+                        uint16_t pick   = (uint16_t)(r % open_count);
 
                         /* Ensure nonzero token */
                         uint8_t try_slot = (uint8_t)open_indices[pick];
@@ -293,9 +289,9 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
         /* Generate test data only when assigned */
         if (assigned_slot >= 0) {
             /* Check retransmit bit for our slot */
-            bool should_retransmit = false;
+            bool should_retransmit  = false;
             if (assigned_slot < 32 && (retransmit_bitmap32 & (1U << assigned_slot))) {
-                should_retransmit = true;
+                should_retransmit   = true;
                 printk("[SYNC] should retransmit for slot %d\n", assigned_slot);
             }
 
@@ -326,7 +322,6 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
     if (sync_handle) {
         return;
     }
-
     if (!(info->adv_props & BT_GAP_ADV_PROP_EXT_ADV)) {
         return;
     }
@@ -354,9 +349,9 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 
 int main(void)
 {
-    int err;
-    static struct bt_le_scan_cb scan_cb = { .recv = scan_recv_cb };
-    static struct bt_le_per_adv_sync_cb sync_callbacks = {.synced = sync_cb, .term = term_cb, .recv = recv_cb };
+    int             err;
+    static struct   bt_le_scan_cb scan_cb                 = { .recv = scan_recv_cb };
+    static struct   bt_le_per_adv_sync_cb sync_callbacks  = {.synced = sync_cb, .term = term_cb, .recv = recv_cb };
     printk("Starting PAwR Synchronizer\n");
 
     k_work_init_delayable(&retry_subevent_sync_work, set_subevent_retry);
@@ -367,9 +362,7 @@ int main(void)
         return 0;
     }
 
-    
     bt_le_per_adv_sync_cb_register(&sync_callbacks);
-
     bt_le_scan_cb_register(&scan_cb);
 
     err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
@@ -377,7 +370,6 @@ int main(void)
         printk("[SCAN] Error: start failed (err %d)\n", err);
         return 0;
     }
-
     printk("[SCAN] Waiting for periodic advertiser...\n");
 
     /* Wait for sync */

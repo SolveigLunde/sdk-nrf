@@ -1,23 +1,21 @@
 # Copyright (c) 2025 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-mainmenu "Maximum Throughput Sample"
+mainmenu "Throughput PAwR Sample"
 
-config MAX_THROUGHPUT
-	bool "Maximum Throughput Sample Settings"
+config THROUGHPUT_PAWR
+	bool "Throughput PAwR Sample Settings"
 	default y
 	help
-		Enable configuration options for maximum throughput sample
+		Enable configuration options for throughput PAwR sample
 
-config BT_MAX_THROUGHPUT_DEVICES
+config BT_NUM_RSP_DEVICES
 	int "Number of PAwR scanner devices"
 	default 16
 	range 1 255
-	depends on MAX_THROUGHPUT
+	depends on THROUGHPUT_PAWR
 	help
 		Number of scanner devices that will participate in the PAwR communication.
 		This affects timing calculations.
-		IMPORTANT: This value must match the NUM_SYNCHRONIZERS in run_devices.sh
 		
-
 source "Kconfig.zephyr" 
