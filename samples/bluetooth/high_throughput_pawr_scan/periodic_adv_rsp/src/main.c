@@ -281,6 +281,14 @@ static void request_cb(struct bt_le_ext_adv *adv, const struct bt_le_per_adv_dat
     for (int i = 0; i < bitmap_bytes; i++) {
         retransmit_bitmap[i] = expected_responses[i] & (~response_bitmap[i]);
     }
+    /* Reporting which slots missed a response */
+    for (int s = 0; s < NUM_RSP_SLOTS; s++) {
+        uint8_t idx = (uint8_t)(s / 8);
+        uint8_t bit = (uint8_t)(s % 8);
+        if (idx < bitmap_bytes && (retransmit_bitmap[idx] & (uint8_t)(1U << bit))) {
+            printk("[LOSS] slot %d missed response; should retransmit\n", s);
+        }
+    }
     reclaim_idle_slots();
 
     /* Reset response bitmap */
@@ -348,7 +356,7 @@ void handle_claim_message(struct net_buf_simple *buf, struct bt_le_per_adv_respo
     }
 }
 
-static void print_throughput(int64_t stamp, uint32_t total_bytes)
+static void print_throughput(uint64_t stamp, uint32_t total_bytes)
 {
     int64_t delta = k_uptime_delta(&stamp);
     uint64_t measured_kbps = (delta > 0) ? (((uint64_t)total_bytes * 8ULL) / (uint64_t)delta) : 0ULL;
@@ -378,12 +386,12 @@ static void print_throughput(int64_t stamp, uint32_t total_bytes)
 static void response_cb(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response_info *info, struct net_buf_simple *buf)
 {
     static uint32_t     total_bytes;
-    static int64_t      stamp;
+    static uint64_t      stamp;
 
     if (buf) {
         /* Initialize timestamp on first response */
         if (total_bytes == 0) {
-            stamp = k_uptime_get();
+            stamp = k_uptime_get_32();
         }
 
         /* Handle claim messages or data responses */

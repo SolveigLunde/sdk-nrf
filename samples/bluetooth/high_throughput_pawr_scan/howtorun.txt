@@ -169,3 +169,4 @@ the dut.dev.attr_shortname flag is used to only run for 54l15. I needed it becau
 choose one of the following: 
     ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr"
     ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr dut.dev.attr_shortname=54l15*"
+    

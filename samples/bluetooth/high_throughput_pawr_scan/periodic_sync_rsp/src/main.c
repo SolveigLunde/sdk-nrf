@@ -28,8 +28,6 @@
 static  K_SEM_DEFINE(sem_per_sync, 0, 1);
 static  K_SEM_DEFINE(sem_per_sync_lost, 0, 1);
 
-static  struct   bt_le_per_adv_sync      *sync_handle;
-
 /* Join/assignment state */
 static  uint8_t  target_subevent         =  0;   /* single subevent flow */
 static  int8_t   assigned_slot           = -1;   /* -1 means unassigned */
@@ -37,7 +35,9 @@ static  uint32_t my_token                =  0;   /* 0 means no token yet */
 static  uint8_t  join_backoff_mod        =  3;   /* attempt every N events initially */
 static  uint8_t  join_backoff_increase   =  0;   /* linear backoff growth */
 
-static  struct   k_work_delayable        retry_subevent_sync_work;
+
+static  struct   bt_le_per_adv_sync     *sync_handle;
+static  struct   k_work_delayable       retry_subevent_sync_work;
 static  uint8_t  subevent_retry_tries;
 
 static bool name_match_cb(struct bt_data *data, void *user_data)
@@ -288,13 +288,6 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
 
         /* Generate test data only when assigned */
         if (assigned_slot >= 0) {
-            /* Check retransmit bit for our slot */
-            bool should_retransmit  = false;
-            if (assigned_slot < 32 && (retransmit_bitmap32 & (1U << assigned_slot))) {
-                should_retransmit   = true;
-                printk("[SYNC] should retransmit for slot %d\n", assigned_slot);
-            }
-
             net_buf_simple_reset(&rsp_buf);
             for (int i = 0; i < payload_rsp_size; i++) {
                 net_buf_simple_add_u8(&rsp_buf, (uint8_t)(assigned_slot + i));
