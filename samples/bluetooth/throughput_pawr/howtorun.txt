@@ -1,0 +1,172 @@
+Step-by-step how to run the sample on physical dks: 
+-----------------------------------------------------
+
+First, some small alterations that might need to be made: 
+
+In prj.conf (both sync and adv) uncomment the last lines of code if it is commented out. 
+It can be there for simulations in bsim as well but it just gave a lot more prints making it look a bit messy. 
+Also remember to set the number of devices to the amout you acctually have, it will just freeze if you forget and its annoying to have to rebuild everything.
+
+-----------------------------------------------------
+Step 1. connecting DKs
+
+Connect the DKs to the computer
+To get access to the DK from wsl follow this quide: https://github.com/balaji-srin/nrf-wsl-guide/tree/main#readme
+
+Step 2. In wsl
+
+confirm dk ids and ports
+Go to docker -> run nrfjprog --com 
+Note the comms as you could use this in step 5
+
+If you do not have nrfjprog download it (but should be in the docker image)
+
+Step 3. Build sample from folder
+
+```bash
+    #Advertiser: 
+    west build -p always -b nrf54l15dk/nrf54l15/cpuapp 
+
+    #Sync scanner: 
+    west build -p always -b nrf54l15dk/nrf54l15/cpuapp
+```
+
+Note: remember to set the number of devices in prj.conf before building the advertiser
+
+Step 4. Flash roles to the DKs
+
+```bash
+    #Advertiser
+    west flash -d periodic_adv_rsp/build --snr <id-number>
+
+    #Sync scanners (repeat for number of devices. Remember to change id)
+    west flash -d periodic_sync_rsp/build --snr <id-number>
+
+    #Example: 
+    west flash -d periodic_adv_rsp/build --snr 1057716157
+```
+
+Step 5. View logs
+
+Open one terminal for each device (sync + adv) and go into docker
+    ```bash
+    # Example: DK 1057716157 (VCOM0)
+    /bin/stty -F /dev/ttyACM0 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM0
+    ```
+    ```bash
+    # DK 1057717549 (VCOM0)
+    /bin/stty -F /dev/ttyACM2 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM2
+    ```
+    ```bash
+    # DK 1057785361 (VCOM0)
+    /bin/stty -F /dev/ttyACM4 raw -echo -icrnl -onlcr -ixon -ixoff 115200
+    /bin/cat /dev/ttyACM4
+    ```
+Press the DK’s reset button after connecting.
+If a VCOM0 is silent, try that DK’s VCOM1 (`/dev/ttyACM1`, `/dev/ttyACM3`, `/dev/ttyACM5`) at 115200. Or just try all the com from step 2
+Exit with Ctrl-C.
+
+================================================================================================================================================
+Step-by-step how to run the test: 
+
+1) Placing and sanity checks
+First place the test in the right place. 
+It should be located in ~/ncs/dragoon/verification/tests/ble_samples
+
+Attach you dev.kits to wsl as you did above. 
+You can also check that this is done in the docker image by running 'nrfjprog -i' inside docker. 
+
+In the build.json file in the test, make sure the paths are the same as in your setup. 
+
+2) Generate device config for the test harness
+
+outside of docker, but in wsl
+'''
+    cd ~/ncs/dragoon
+    mkdir -p ~/TargetTestsDevConf
+    python3 ./verification/scripts/generate_dev_conf.py -o ~/TargetTestsDevConf/
+'''
+
+open user_devconf.yml to ensure it has the connected dks. 
+Do this by running
+'''
+    nano ~/TargetTestsDevConf/user_devconf.yml
+'''
+
+
+In this step you might have some problems, if you do. Try this:
+'''
+    cd ~/ncs/dragoon
+   mkdir -p ~/TargetTestsDevConf
+    cat > ~/TargetTestsDevConf/shortname_db.json << 'JSON'
+    {
+    "platforms": {
+        "NRF54L15_xxAA_ENGC": { "shortname": "54l15" },
+        "NRF54L15_xxAA_ENGB": { "shortname": "54l15" }
+    }
+    }
+    JSON
+
+    cd ~/ncs/dragoon
+    python3 ./verification/scripts/generate_dev_conf.py \
+    -y -o ~/TargetTestsDevConf/ -vv \
+    --use-database ~/TargetTestsDevConf/shortname_db.json
+'''
+Verify that the file is produced properly by: 
+    grep -n 'id: sdsoc_sl' ~/TargetTestsDevConf/user_devconf.yml
+    grep -n 'dut_54l15' ~/TargetTestsDevConf/user_devconf.yml
+    grep -n 'tester_54l15' ~/TargetTestsDevConf/user_devconf.yml
+    grep -n 'tester1_54l15' ~/TargetTestsDevConf/user_devconf.yml
+
+
+The final file should look approximately like this: 
+
+    configurations:
+    - default: true
+    dut_54l15: dev_54l15_0
+    id: sdsoc_sl
+    tester1_54l15: dev_54l15_2
+    tester_54l15: dev_54l15_1
+    type: '*_sl'
+    devices:
+    - family: nrf54l
+    name: dev_54l15_0
+    segger: '1057716157'
+    - family: nrf54l
+    name: dev_54l15_1
+    segger: '1057785361'
+    - family: nrf54l
+    name: dev_54l15_2
+    segger: '1057720978'
+
+Before you continue, check that the file is visible in docker. 
+    cd ~/ncs/dragoon
+    ./indocker.sh ls -l /home/TargetTestsDevConf/user_devconf.yml
+
+If yes, you're good to go
+
+3) Build the sample
+
+build the sample as normal. See above section. 
+
+4) Build the test in docker
+
+'''
+    cd ~/ncs/dragoon
+    choose one of the following: 
+
+    ./indocker.sh python3 build.py -e "test_suite_id=*HighThroughputPAwRSampleTest*"
+
+    ./indocker.sh python3 build.py -e "test_suite_id=*HighThroughputPAwRSampleTest* dut.dev.attr_shortname=54l15*"
+'''
+
+the dut.dev.attr_shortname flag is used to only run for 54l15. I needed it because we had not adapted the sample for other devices. 
+
+5) Run the test
+
+choose one of the following: 
+    ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr"
+    ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr dut.dev.attr_shortname=54l15*"
+    
