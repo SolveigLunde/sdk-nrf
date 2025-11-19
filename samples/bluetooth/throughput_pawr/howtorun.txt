@@ -157,9 +157,9 @@ build the sample as normal. See above section.
     cd ~/ncs/dragoon
     choose one of the following: 
 
-    ./indocker.sh python3 build.py -e "test_suite_id=*HighThroughputPAwRSampleTest*"
+    ./indocker.sh python3 build.py -e "test_suite_id=*ThroughputPAwRSampleTest*"
 
-    ./indocker.sh python3 build.py -e "test_suite_id=*HighThroughputPAwRSampleTest* dut.dev.attr_shortname=54l15*"
+    ./indocker.sh python3 build.py -e "test_suite_id=*ThroughputPAwRSampleTest* dut.dev.attr_shortname=54l15*"
 '''
 
 the dut.dev.attr_shortname flag is used to only run for 54l15. I needed it because we had not adapted the sample for other devices. 
@@ -167,6 +167,6 @@ the dut.dev.attr_shortname flag is used to only run for 54l15. I needed it becau
 5) Run the test
 
 choose one of the following: 
-    ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr"
-    ./indocker.sh ctf_tm -c session -e "test_suite_id=*HighThroughputPAwRSampleTest* test_case_id=test_high_throughput_pawr dut.dev.attr_shortname=54l15*"
+    ./indocker.sh ctf_tm -c session -e "test_suite_id=*ThroughputPAwRSampleTest* test_case_id=test_throughput_pawr"
+    ./indocker.sh ctf_tm -c session -e "test_suite_id=*ThroughputPAwRSampleTest* test_case_id=test_throughput_pawr dut.dev.attr_shortname=54l15*"
     
