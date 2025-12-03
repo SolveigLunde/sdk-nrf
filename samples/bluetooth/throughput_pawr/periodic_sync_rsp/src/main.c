@@ -17,7 +17,7 @@
 #define ACK_ENTRY_SIZE                  5                       /* token (4B) + slot (1B) */
 #define ACK_SLOT_OFFSET                 4                       /* offset of slot in ACK entry */
 #define MIN_PAYLOAD_SIZE                (MSD_HEADER_LEN + 5)    /* MSD header (4B) + protocol version (1B) + protocl flags (1B), open_len (1B), ack_count(1B), rt_len(1B) */
-#define MAX_INDIVIDUAL_RESPONSE_SIZE    247                     /* BLE spec limit for individual responses */
+#define MAX_INDIVIDUAL_RESPONSE_SIZE    247            
 
 /* Variables for token based claim/ack protocol*/
 #define CLAIM_MSG_ID                    0xC1
@@ -110,7 +110,6 @@ static void sync_cb(struct bt_le_per_adv_sync *sync,
     printk("[SYNC] Synced to %s with %d subevents\n", le_addr, info->num_subevents);
 
     sync_handle             = sync;
-
     params.properties       = 0;
     params.num_subevents    = 1;
     params.subevents        = subevents;
@@ -155,16 +154,16 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
     static struct bt_le_per_adv_response_params rsp_params;
     NET_BUF_SIMPLE_DEFINE_STATIC(rsp_buf, 260);
     const int data_buf_size = 3;  /* 1 byte for manufacturer data ID, 2 bytes for company ID */
+    static uint8_t open_seen_consecutive;
 
     /* Initialize payload response size if not set */
     if (payload_rsp_size == 0) {
         payload_rsp_size = MAX_INDIVIDUAL_RESPONSE_SIZE - data_buf_size;
-        //printk("[SYNC] Response size: %d bytes\n", payload_rsp_size);
     }
 
     if (buf && buf->len) {
         uint8_t         open_len            = 0;
-        uint8_t         open_bitmap[32]; /* supports up to 256 slots */
+        uint8_t         open_bitmap[32];
         memset(open_bitmap, 0, sizeof(open_bitmap));
         uint8_t         ack_count           = 0;
         const uint8_t   *acks_ptr           = NULL;
@@ -210,6 +209,23 @@ static void recv_cb(struct bt_le_per_adv_sync *sync, const struct bt_le_per_adv_
                         retransmit_bitmap32 |= ((uint32_t)data[idx + i]) << (8 * i);
                     }
                 }
+            }
+        }
+
+        if (assigned_slot >= 0) {
+            uint8_t idx_b = (uint8_t)(assigned_slot / 8);
+            uint8_t bit_b = (uint8_t)(assigned_slot % 8);
+            bool is_open = (idx_b < open_len) && (open_bitmap[idx_b] & (uint8_t)(1U << bit_b));
+        
+            if (is_open) {
+                if (++open_seen_consecutive >= 2) {
+                    printk("[JOIN] Evicted: slot %d marked open; rejoining\n", assigned_slot);
+                    assigned_slot = -1;              /* drop claim */
+                    open_seen_consecutive = 0;
+                    join_backoff_increase = 0;       /* optional: speed up re-join */
+                }
+            } else {
+                open_seen_consecutive = 0;
             }
         }
 

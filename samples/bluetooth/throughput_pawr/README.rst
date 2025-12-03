@@ -31,7 +31,30 @@ It consists of two roles:
 
 The synchronizer discovers the advertiser by device name (``"PAwR adv sample"``). The advertiser prints measured and theoretical throughput for the active set of responders.
 
-Limitations and trade-offs*
+Default parameter values
+========================
+
+.. list-table:: Default parameter values
+   :header-rows: 1
+
+   * - Parameter
+     - Value
+   * - Number of responders (slots)
+     - 2
+   * - Response payload size
+     - 247 bytes
+   * - PHY data rate
+     - LE 2M
+   * - Response slot delay
+     - 3 units (3.75 ms)
+   * - Response slot spacing
+     - computed from payload and PHY
+   * - Subevent interval
+     - 6 units (7.50 ms)
+   * - Retransmit bitmap bytes
+     - up to 4
+
+Limitations and trade-offs
 ===========================
 
 This sample demonstrates a connectionless, token-based claim/ACK protocol over PAwR. Compared to GATT connections or using Periodic Advertising Sync Transfer (PAST) with a connected control plane, consider the following trade-offs:
@@ -44,14 +67,15 @@ This sample demonstrates a connectionless, token-based claim/ACK protocol over P
 
 These constraints are typical of random access, connectionless schemes. If your use case demands stronger fairness, reliability, or access control, a GATT-based design (optionally using PAST to distribute sync) is usually preferable.
 
-Configuration*
+Configuration
 **************
 
 |config|
 
 .. _throughput_pawr_config_options:
 
-Configuration options*
+
+Configuration options
 ======================
 
 Check and configure the following sample-specific Kconfig options:
@@ -59,12 +83,17 @@ Check and configure the following sample-specific Kconfig options:
 .. code-block::
 
    .. options-from-kconfig::
-      :show-type:
+      :kconfig:option:`CONFIG_BT_NUM_RSP_DEVICES`
 
-Additional configuration*
-=========================
+.. note::
+   Before building the advertiser, set :kconfig:option:`CONFIG_BT_NUM_RSP_DEVICES` in ``periodic_adv_rsp/prj.conf`` to the number of synchronizer devices you plan to run.
+   If this value does not match your setup, the advertiser may appear stalled while waiting for unassigned or missing responders.
 
-Key Bluetooth and controller options used by the sample include:
+
+Additional configuration
+========================
+
+Key Bluetooth and controller options used by this sample include:
 
 - :kconfig:option:`CONFIG_BT_PER_ADV`
 - :kconfig:option:`CONFIG_BT_PER_ADV_RSP`
@@ -74,15 +103,16 @@ Key Bluetooth and controller options used by the sample include:
 - :kconfig:option:`CONFIG_BT_CTLR_DATA_LENGTH_MAX`
 - :kconfig:option:`CONFIG_BT_L2CAP_TX_MTU`
 - :kconfig:option:`CONFIG_BT_USER_PHY_UPDATE`
+- :kconfig:option:`CONFIG_BT_DEVICE_NAME`
 
-See each role’s ``prj.conf`` for complete configuration:
+Configuration files
+===================
+
+This sample provides predefined configuration files for typical use:
 
 - ``periodic_adv_rsp/prj.conf`` — advertiser/host settings (slot count, buffer sizes, timing).
 - ``periodic_sync_rsp/prj.conf`` — synchronizer/responder settings (PAwR sync, payload size, buffers).
 
-.. note::
-   Before building the advertiser, set :kconfig:option:`CONFIG_BT_NUM_RSP_DEVICES` in ``periodic_adv_rsp/prj.conf`` to the number of synchronizer devices you plan to run.
-   If this value does not match your setup, the advertiser may appear stalled while waiting for unassigned or missing responders.
 
 Building and running
 ********************
@@ -93,15 +123,16 @@ Building and running
 
 Build the two roles separately and program them to different development kits:
 
-Advertiser (from the sample root)::
+Advertiser ::
+   cd periodic_adv_rsp
+   west build -p always -b nrf54l15dk/nrf54l15/cpuapp 
 
-   west build -p always -b nrf54l15dk/nrf54l15/cpuapp -d periodic_adv_rsp/build -s periodic_adv_rsp
-
-Synchronizer (repeat for as many kits as you plan to use)::
-
-   west build -p always -b nrf54l15dk/nrf54l15/cpuapp -d periodic_sync_rsp/build -s periodic_sync_rsp
+Synchronizer ::
+   cd periodic_sync_rsp
+   west build -p always -b nrf54l15dk/nrf54l15/cpuapp 
 
 After building, flash each role to its target kit.
+
 
 Testing
 =======
@@ -157,16 +188,23 @@ For the synchronizers::
     [JOIN] Sent claim for slot 0 with token 0xb4a6d332
     [JOIN] Acked: token 0xb4a6d332 assigned slot 0
 
-Note:
+.. note::
 Retransmission log messages may occur. The advertiser reports missed slots and suggests retransmission, 
 but the responder in this sample always sends fresh payloads and does not implement retransmission logic.
 
-Loss messages for advertiser::
-    [LOSS] slot 1 missed response; should retransmit
-    [CLAIM] Reclaimed idle slot 1
+Troubleshooting
+===============
 
-Loss messages for synchronizers::
-    [SYNC] Failed to send response (err -5)
+- [LOSS] slot X missed response; should retransmit
+  - The advertiser expected data from that slot this event but didn’t receive it.
+  - After first real payload from a slot, retransmit hints may appear under RF loss.
+
+- [CLAIM] Reclaimed idle slot X
+  - The advertiser freed a slot after several missed events. Responders should re-join.
+
+- Failed to set subevent data (err -13)
+  - Controller rejected PAwR subevent parameters (e.g., subevent index out of range).
+  - Ensure subevent index is modulo the configured number of subevents and data length fits.
 
 Dependencies
 *************
@@ -186,7 +224,16 @@ This sample uses the following Zephyr libraries:
 * :file:`include/zephyr/random/random.h`
 * :file:`include/zephyr/net/buf.h`
 * :file:`include/zephyr/sys/printk.h`
+* :file:`include/zephyr/sys/util.h`
 
 It uses the following `sdk-nrfxlib`_ library:
 
 * :ref:`nrfxlib:softdevice_controller`
+
+References
+*************
+
+For more about Periodic Advertising with Responses (PAwR), see the Bluetooth Core Specification:
+- LE Periodic Advertising
+- LE Periodic Advertising with Responses (PAwR)
+- LE Controller timing parameters (subevent interval, response slot delay/spacing)

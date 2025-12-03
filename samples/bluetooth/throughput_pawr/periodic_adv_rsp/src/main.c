@@ -23,16 +23,16 @@
 
 #define NUM_RSP_SLOTS                   CONFIG_BT_NUM_RSP_DEVICES
 #define NUM_SUBEVENTS                   1
-#define PAYLOAD_SIZE                    251
+#define MAX_BT_DATA_LENGTH              CONFIG_BT_CTLR_DATA_LENGTH_MAX
 #define ADV_NAME                        "PAwR adv sample"
 #define NORDIC_COMPANY_ID               0x0059 
 
-#define MAX_INDIVIDUAL_RESPONSE_SIZE    247     /* BLE spec limit for individual responses */
+#define MAX_INDIVIDUAL_RESPONSE_SIZE    CONFIG_BT_CTLR_SDC_PERIODIC_ADV_RSP_TX_MAX_DATA_SIZE
 #define THROUGHPUT_PRINT_INTERVAL       1000 
 #define PAWR_CLAIM_MSG_ID               0xC1
 #define CLAIM_MSG_LEN                   5       /* Claim token length (4B) + Claim token offset (1B) */
 #define PAWR_INTERVAL_UNIT_MS_X100      125U
-#define PAWR_PHY_MBIT_PER_S             2U      /* LE 2M */
+#define PHY_2M                          2U   
  
 
 void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_slots)
@@ -45,8 +45,8 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     const uint32_t response_slot_delay_ms_x100  = (uint32_t)response_slot_delay_units * PAWR_INTERVAL_UNIT_MS_X100;
 
     /* Approximate on-air time + radio turnarounds at 2M PHY */
-    const uint32_t payload_bits     = (uint32_t)payload_size * 8U;          /* payload_size * 8 bits = total bits to transmit */
-    const uint32_t tx_denom_ms      = (uint32_t)PAWR_PHY_MBIT_PER_S * 10U;  /* PAWR_PHY_MBIT_PER_S * 10 = bits per ms */
+    const uint32_t payload_bits     = (uint32_t)payload_size * 8U;  /* payload_size * 8 bits = total bits to transmit */
+    const uint32_t tx_denom_ms      = (uint32_t)PHY_2M * 10U;       /* 2M_PHY * 10 = bits per ms */
     const uint32_t tx_time_ms_x100  = (payload_bits + tx_denom_ms - 1U) / tx_denom_ms; 
     const uint32_t slot_ms_x100     = tx_time_ms_x100 + quarter_ms_x100;
     const uint32_t slot_units       = DIV_ROUND_UP(slot_ms_x100 * 10U, PAWR_INTERVAL_UNIT_MS_X100);
@@ -57,7 +57,7 @@ void set_pawr_params(struct bt_le_per_adv_param *params, uint8_t num_response_sl
     uint32_t subevent_interval_units_tmp    = DIV_ROUND_UP(subevent_ms_x100, PAWR_INTERVAL_UNIT_MS_X100);
     uint16_t subevent_interval_units        = (uint16_t)(subevent_interval_units_tmp);
     if (subevent_interval_units < 6U) {
-        subevent_interval_units = 6U;
+        subevent_interval_units = 6U; /* Minimum subevent interval (6*1.25 = 7.5 ms)*/
     } else if (subevent_interval_units > 255U) {
         subevent_interval_units = 255U;
         printk("Warning: subevent too long for one window; consider fewer devices or smaller payload.\n");
@@ -109,7 +109,7 @@ void init_adv_params(void)
 
 static struct bt_le_per_adv_subevent_data_params subevent_data_params[NUM_SUBEVENTS];
 static struct net_buf_simple bufs[NUM_SUBEVENTS];
-static uint8_t backing_store[NUM_SUBEVENTS][PAYLOAD_SIZE];
+static uint8_t backing_store[NUM_SUBEVENTS][MAX_BT_DATA_LENGTH];
 
 BUILD_ASSERT(ARRAY_SIZE(bufs)           == ARRAY_SIZE(subevent_data_params));
 BUILD_ASSERT(ARRAY_SIZE(backing_store)  == ARRAY_SIZE(subevent_data_params));
@@ -197,6 +197,11 @@ static void bitmap_clear(uint8_t *bitmap, int num_bits)
     memset(bitmap, 0, BITMAP_BYTES_NEEDED(num_bits));
 }
 
+static void bitmap_clear_bit(uint8_t *bitmap, int bit)
+{
+    bitmap[bit / 8] &= (uint8_t)~(1U << (bit % 8));
+}
+
 static void reclaim_idle_slots()
 {
     static uint8_t noresp_counters[NUM_RSP_SLOTS];
@@ -211,6 +216,7 @@ static void reclaim_idle_slots()
                 /* Consider this slot idle; free it for new claimers */
                 slot_state[slot].assigned = false;
                 slot_state[slot].token = 0;
+                bitmap_clear_bit(expected_responses, slot);
                 noresp_counters[slot] = 0;
                 printk("[CLAIM] Reclaimed idle slot %d\n", slot);
             }

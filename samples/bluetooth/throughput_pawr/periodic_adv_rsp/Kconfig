@@ -11,7 +11,7 @@ config THROUGHPUT_PAWR
 
 config BT_NUM_RSP_DEVICES
 	int "Number of PAwR scanner devices"
-	default 16
+	default 2
 	range 1 255
 	depends on THROUGHPUT_PAWR
 	help
